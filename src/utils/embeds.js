@@ -12,7 +12,7 @@ export function mainPanelEmbed(guildName) {
     .setColor(COLORS.primary)
     .setTitle(`Cuenta corriente — ${guildName || 'Gremio'}`)
     .setDescription(
-      'Consultá tu saldo con **Mi cuenta**. Los oficiales tienen acceso a ingresos, egresos y resúmenes del gremio.'
+      '**Mi cuenta** y **Resumen gremio** están disponibles para todos. Oficiales y administradores usan **Más opciones** para agregar o quitar silver y ver movimientos del gremio.'
     )
     .setFooter({ text: 'Silver en cuenta corriente (referencia in-game).' })
     .setTimestamp();

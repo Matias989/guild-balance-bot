@@ -18,7 +18,7 @@ import {
   successEmbed,
   errorEmbed
 } from '../utils/embeds.js';
-import { PREFIX, staffUserSelectRow } from '../utils/components.js';
+import { PREFIX, staffUserSelectRow, staffMoreRows } from '../utils/components.js';
 import { setStaffState, getStaffState, clearStaffState } from '../utils/staffState.js';
 
 function useUpdate(interaction) {
@@ -75,6 +75,46 @@ export async function handleInteraction(interaction) {
       return;
     }
 
+    if (interaction.isButton() && customId === `${PREFIX}guild_summary`) {
+      const accounts = getAllUserBalances(guildId);
+      const aggregate = getGuildBalanceAggregate(guildId);
+      const payload = {
+        embeds: [guildSummaryEmbed(accounts, aggregate)],
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
+    if (interaction.isButton() && customId === `${PREFIX}staff_menu`) {
+      if (!isStaff(interaction, guildId)) {
+        await interaction.reply({
+          embeds: [
+            errorEmbed(
+              'Sin permiso',
+              '**Más opciones** solo está disponible para oficiales y administradores.'
+            )
+          ],
+          ephemeral: true
+        });
+        return;
+      }
+      const payload = {
+        embeds: [
+          staffPromptEmbed(
+            'Más opciones',
+            'Gestioná ingresos, egresos o revisá los últimos movimientos del gremio.'
+          )
+        ],
+        components: staffMoreRows(),
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
     if (interaction.isButton() && customId === `${PREFIX}cancel`) {
       clearStaffState(userId);
       const payload = {
@@ -90,7 +130,6 @@ export async function handleInteraction(interaction) {
     const staffButtons = new Set([
       `${PREFIX}staff_add`,
       `${PREFIX}staff_remove`,
-      `${PREFIX}staff_summary`,
       `${PREFIX}staff_movements`
     ]);
 
@@ -100,7 +139,7 @@ export async function handleInteraction(interaction) {
           embeds: [
             errorEmbed(
               'Sin permiso',
-              'Solo oficiales o administradores pueden usar esta acción.'
+              'Solo oficiales o administradores pueden usar esta acción. Abrí **Más opciones** desde el panel.'
             )
           ],
           ephemeral: true
@@ -133,19 +172,6 @@ export async function handleInteraction(interaction) {
             )
           ],
           components: staffUserSelectRow('remove'),
-          ephemeral: true
-        };
-        if (useUpdate(interaction)) await interaction.update(payload);
-        else await interaction.reply(payload);
-        return;
-      }
-
-      if (customId === `${PREFIX}staff_summary`) {
-        const accounts = getAllUserBalances(guildId);
-        const aggregate = getGuildBalanceAggregate(guildId);
-        const payload = {
-          embeds: [guildSummaryEmbed(accounts, aggregate)],
-          components: [],
           ephemeral: true
         };
         if (useUpdate(interaction)) await interaction.update(payload);
@@ -214,7 +240,7 @@ export async function handleInteraction(interaction) {
       const state = getStaffState(userId);
       if (!state || state.flow !== 'add' || !state.targetUserId) {
         await interaction.reply({
-          embeds: [errorEmbed('Sesión expirada', 'Volvé a abrir **Agregar silver** desde el panel.')],
+          embeds: [errorEmbed('Sesión expirada', 'Volvé a **Más opciones** → **Agregar silver**.')],
           ephemeral: true
         });
         return;
@@ -263,7 +289,7 @@ export async function handleInteraction(interaction) {
       const state = getStaffState(userId);
       if (!state || state.flow !== 'remove' || !state.targetUserId) {
         await interaction.reply({
-          embeds: [errorEmbed('Sesión expirada', 'Volvé a abrir **Quitar silver** desde el panel.')],
+          embeds: [errorEmbed('Sesión expirada', 'Volvé a **Más opciones** → **Quitar silver**.')],
           ephemeral: true
         });
         return;

@@ -35,7 +35,7 @@ npm run dev
 
 ### Panel y permisos
 
-Los botones del mensaje del canal son visibles para todos. Si un miembro pulsa una acción solo para oficiales, recibe un mensaje privado efímero con "Sin permiso".
+En el canal: **Mi cuenta** y **Resumen gremio** los usa cualquier miembro. **Más opciones** abre acciones solo para oficiales (agregar/quitar silver y movimientos); si un miembro común lo pulsa, recibe un aviso efímero sin permiso.
 
 ### Datos
 
