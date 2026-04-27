@@ -104,17 +104,24 @@ export function eventsListRows(events) {
   ];
 }
 
-export function eventDetailRows(eventId, isParticipant, withRoleSelector = false) {
+export function eventDetailRows(eventId, isParticipant, withRoleSelector = false, canManageParticipants = false) {
   const rows = [];
   if (withRoleSelector) rows.push(eventRoleSelectRow(eventId));
-  rows.push(
-    new ActionRowBuilder().addComponents(
-      isParticipant
-        ? new ButtonBuilder().setCustomId(`${PREFIX}leave_event:${eventId}`).setLabel('Salir').setStyle(ButtonStyle.Danger)
-        : new ButtonBuilder().setCustomId(`${PREFIX}join_event:${eventId}`).setLabel('Unirme').setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId(`${PREFIX}events`).setLabel('Volver eventos').setStyle(ButtonStyle.Secondary)
-    )
-  );
+  const buttons = [
+    isParticipant
+      ? new ButtonBuilder().setCustomId(`${PREFIX}leave_event:${eventId}`).setLabel('Salir').setStyle(ButtonStyle.Danger)
+      : new ButtonBuilder().setCustomId(`${PREFIX}join_event:${eventId}`).setLabel('Unirme').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(`${PREFIX}events`).setLabel('Volver eventos').setStyle(ButtonStyle.Secondary)
+  ];
+  if (canManageParticipants) {
+    buttons.unshift(
+      new ButtonBuilder()
+        .setCustomId(`${PREFIX}remove_from_event:${eventId}`)
+        .setLabel('Quitar participantes')
+        .setStyle(ButtonStyle.Primary)
+    );
+  }
+  rows.push(new ActionRowBuilder().addComponents(...buttons));
   return rows;
 }
 
@@ -172,6 +179,31 @@ export function closeAttendeesRows(eventId, participants) {
     new ActionRowBuilder().addComponents(select),
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`${PREFIX}cancel`).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
+
+export function removeParticipantsRows(eventId, participants) {
+  if (!participants?.length) {
+    return [
+      new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId(`${PREFIX}events`).setLabel('Volver eventos').setStyle(ButtonStyle.Secondary)
+      )
+    ];
+  }
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`${PREFIX}remove_participants:${eventId}`)
+    .setPlaceholder('Selecciona a quiénes quitar...')
+    .setMinValues(1)
+    .setMaxValues(Math.max(1, Math.min(25, participants.length)))
+    .addOptions(participants.slice(0, 25).map((p, i) => ({
+      label: (p.displayName || `Participante ${i + 1}`).slice(0, 100),
+      value: p.user_id
+    })));
+  return [
+    new ActionRowBuilder().addComponents(select),
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`${PREFIX}events`).setLabel('Volver eventos').setStyle(ButtonStyle.Secondary)
     )
   ];
 }

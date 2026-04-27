@@ -41,6 +41,7 @@ import {
   eventDetailRows,
   closeEventSelectRows,
   closeAttendeesRows,
+  removeParticipantsRows,
   createEventActivitySelect,
   mainPanelRows,
   eventAnnouncementRows
@@ -341,7 +342,7 @@ export async function handleInteraction(interaction) {
       const isParticipant = participants.some((p) => p.user_id === userId);
       await interaction.update({
         embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
-        components: eventDetailRows(eventId, isParticipant, isGroupEvent(event)),
+        components: eventDetailRows(eventId, isParticipant, isGroupEvent(event), isStaff(interaction, guildId)),
         ephemeral: true
       });
       return;
@@ -386,7 +387,72 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       await interaction.update({
         embeds: [successEmbed('Rol actualizado', `Quedaste como **${selectedRole}**.`), eventDetailEmbed(event, participants, true)],
-        components: eventDetailRows(eventId, true, true),
+        components: eventDetailRows(eventId, true, true, isStaff(interaction, guildId)),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isButton() && customId.startsWith(`${PREFIX}remove_from_event:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      if (!isStaff(interaction, guildId)) {
+        await interaction.reply({
+          embeds: [errorEmbed('Sin permiso', 'Solo staff puede quitar participantes de un evento.')],
+          ephemeral: true
+        });
+        return;
+      }
+      const event = getEvent(eventId);
+      if (!event || event.status !== 'active') {
+        await interaction.reply({
+          embeds: [errorEmbed('No disponible', 'Evento no encontrado o ya cerrado.')],
+          ephemeral: true
+        });
+        return;
+      }
+      const participants = getEventParticipants(eventId);
+      const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      await interaction.reply({
+        embeds: [staffPromptEmbed('Quitar participantes', `Evento #${eventId}. Selecciona a quiénes quieres quitar.`)],
+        components: removeParticipantsRows(eventId, participantsWithNames),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && customId.startsWith(`${PREFIX}remove_participants:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      if (!isStaff(interaction, guildId)) {
+        await interaction.reply({
+          embeds: [errorEmbed('Sin permiso', 'Solo staff puede quitar participantes de un evento.')],
+          ephemeral: true
+        });
+        return;
+      }
+      const event = getEvent(eventId);
+      if (!event || event.status !== 'active') {
+        await interaction.update({
+          embeds: [errorEmbed('No disponible', 'Evento no encontrado o ya cerrado.')],
+          components: [],
+          ephemeral: true
+        });
+        return;
+      }
+      const userIdsToRemove = interaction.values || [];
+      let removed = 0;
+      for (const uid of userIdsToRemove) {
+        if (leaveEvent(eventId, uid)) removed++;
+      }
+      updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
+
+      const participants = getEventParticipants(eventId);
+      const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      await interaction.update({
+        embeds: [
+          successEmbed('Participantes quitados', `Se quitaron **${removed}** participante(s) del evento #${eventId}.`),
+          eventDetailEmbed(event, participants, isGroupEvent(event))
+        ],
+        components: removeParticipantsRows(eventId, participantsWithNames),
         ephemeral: true
       });
       return;
@@ -457,6 +523,7 @@ export async function handleInteraction(interaction) {
       const participants = getEventParticipants(eventId);
       await interaction.reply({
         embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
+        components: eventDetailRows(eventId, true, isGroupEvent(event), isStaff(interaction, guildId)),
         ephemeral: true
       });
       return;
@@ -474,6 +541,7 @@ export async function handleInteraction(interaction) {
       const participants = getEventParticipants(eventId);
       await interaction.reply({
         embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
+        components: eventDetailRows(eventId, false, isGroupEvent(event), isStaff(interaction, guildId)),
         ephemeral: true
       });
       return;
