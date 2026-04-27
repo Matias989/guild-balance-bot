@@ -173,7 +173,8 @@ export function closeAttendeesRows(eventId, participants) {
     .setMaxValues(Math.max(1, Math.min(25, participants.length)))
     .addOptions(participants.slice(0, 25).map((p, i) => ({
       label: (p.displayName || `Participante ${i + 1}`).slice(0, 100),
-      value: p.user_id
+      value: p.user_id,
+      default: true
     })));
   return [
     new ActionRowBuilder().addComponents(select),
