@@ -134,3 +134,143 @@ export function getBalanceHistory(guildId, userId, limit = 15) {
     LIMIT ?
   `).all(guildId, userId, limit);
 }
+
+const ACTIVITY_TYPES = ['Grupal', 'Mazmorra', 'Avalonian', 'ZvZ', 'Hellgate', 'Recoleccion', 'Otro'];
+const EVENT_ROLES = ['Tanque', 'Healer', 'Flamigero', 'Shadow Caller', 'Otros'];
+
+export function getActivityTypes() {
+  return ACTIVITY_TYPES;
+}
+
+export function getEventRoles() {
+  return EVENT_ROLES;
+}
+
+export function isGroupEvent(event) {
+  return event?.activity_type === 'Grupal';
+}
+
+export function createEvent(guildId, creatorId, data) {
+  const result = db.prepare(`
+    INSERT INTO events (guild_id, creator_id, activity_type, name, scheduled_at, max_participants, affects_accounting)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    guildId,
+    creatorId,
+    data.activityType,
+    data.name || data.activityType,
+    data.scheduledAt,
+    Math.max(1, Math.min(25, data.maxParticipants || 8)),
+    data.affectsAccounting !== false ? 1 : 0
+  );
+  return Number(result.lastInsertRowid);
+}
+
+export function getEvent(eventId) {
+  return db.prepare('SELECT * FROM events WHERE id = ?').get(eventId);
+}
+
+export function getActiveEvents(guildId) {
+  return db.prepare(`
+    SELECT * FROM events
+    WHERE guild_id = ? AND status = 'active'
+    ORDER BY scheduled_at ASC
+    LIMIT 25
+  `).all(guildId);
+}
+
+export function getClosableEvents(guildId) {
+  return db.prepare(`
+    SELECT * FROM events
+    WHERE guild_id = ? AND status = 'active'
+    ORDER BY scheduled_at DESC
+    LIMIT 25
+  `).all(guildId);
+}
+
+export function getEventParticipants(eventId) {
+  return db.prepare('SELECT * FROM event_participants WHERE event_id = ?').all(eventId);
+}
+
+export function joinEvent(eventId, userId, guildId, role = 'Otros') {
+  const event = getEvent(eventId);
+  if (!event) return { ok: false, reason: 'Evento no encontrado.' };
+  if (guildId && event.guild_id !== guildId) return { ok: false, reason: 'Evento de otro servidor.' };
+  if (event.status !== 'active') return { ok: false, reason: 'El evento ya fue cerrado.' };
+  const exists = db.prepare('SELECT 1 FROM event_participants WHERE event_id = ? AND user_id = ?').get(eventId, userId);
+  if (exists) return { ok: false, reason: 'Ya estas inscripto.' };
+  const count = db.prepare('SELECT COUNT(*) AS c FROM event_participants WHERE event_id = ?').get(eventId).c;
+  if (count >= event.max_participants) return { ok: false, reason: 'Cupos llenos.' };
+  const normalizedRole = isGroupEvent(event) && EVENT_ROLES.includes(role) ? role : 'Otros';
+  db.prepare('INSERT INTO event_participants (event_id, user_id, role) VALUES (?, ?, ?)').run(eventId, userId, normalizedRole);
+  return { ok: true };
+}
+
+export function updateParticipantRole(eventId, userId, role, event = null) {
+  const ev = event || getEvent(eventId);
+  const normalizedRole = isGroupEvent(ev) && EVENT_ROLES.includes(role) ? role : 'Otros';
+  const result = db.prepare('UPDATE event_participants SET role = ? WHERE event_id = ? AND user_id = ?')
+    .run(normalizedRole, eventId, userId);
+  return result.changes > 0;
+}
+
+export function leaveEvent(eventId, userId) {
+  const result = db.prepare('DELETE FROM event_participants WHERE event_id = ? AND user_id = ?').run(eventId, userId);
+  return result.changes > 0;
+}
+
+export function closeEvent(eventId, attendedUserIds, totalLoot, closedByUserId = null) {
+  const event = getEvent(eventId);
+  if (!event || event.status !== 'active') return { ok: false, reason: 'Evento invalido o cerrado.' };
+  const participants = getEventParticipants(eventId);
+  if (!participants.length) return { ok: false, reason: 'No hay participantes.' };
+
+  const attended = new Set((attendedUserIds || []).filter(Boolean));
+  const attendedFinal = participants
+    .map((p) => p.user_id)
+    .filter((uid) => attended.has(uid));
+  if (!attendedFinal.length) return { ok: false, reason: 'No seleccionaste asistentes.' };
+
+  const loot = Number(totalLoot || 0);
+  if (!Number.isFinite(loot) || loot < 0) return { ok: false, reason: 'Loot invalido.' };
+
+  const txn = db.transaction(() => {
+    db.prepare("UPDATE events SET status = 'closed', closed_at = CURRENT_TIMESTAMP, total_loot = ? WHERE id = ?")
+      .run(loot, eventId);
+
+    for (const p of participants) {
+      const attendedFlag = attended.has(p.user_id) ? 1 : 0;
+      db.prepare('UPDATE event_participants SET attended = ? WHERE event_id = ? AND user_id = ?')
+        .run(attendedFlag, eventId, p.user_id);
+    }
+
+    let share = 0;
+    const affectsAccounting = event.affects_accounting !== 0;
+    if (affectsAccounting && loot > 0) {
+      // Reparto completo entre asistentes (sin comision al gremio).
+      share = loot / attendedFinal.length;
+      for (const uid of attendedFinal) {
+        addToBalance(
+          event.guild_id,
+          uid,
+          share,
+          'loot_evento',
+          `Evento #${eventId} - ${event.activity_type}`,
+          closedByUserId
+        );
+      }
+    }
+    return { share, attendedCount: attendedFinal.length };
+  });
+
+  const result = txn();
+  return {
+    ok: true,
+    event,
+    attendedUserIds: attendedFinal,
+    sharePerUser: result.share,
+    attendedCount: result.attendedCount,
+    totalLoot: loot,
+    affectsAccounting: event.affects_accounting !== 0
+  };
+}

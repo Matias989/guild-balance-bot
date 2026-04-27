@@ -146,3 +146,62 @@ export function successEmbed(title, description) {
 export function errorEmbed(title, description) {
   return new EmbedBuilder().setColor(COLORS.error).setTitle(title).setDescription(description).setTimestamp();
 }
+
+export function eventsListEmbed(events) {
+  const embed = new EmbedBuilder()
+    .setColor(COLORS.info)
+    .setTitle('Eventos activos')
+    .setTimestamp();
+
+  if (!events?.length) {
+    embed.setDescription('No hay eventos activos por ahora.');
+    return embed;
+  }
+
+  const lines = events.map((e) =>
+    `#${e.id} · **${e.activity_type}** · <t:${Math.floor(new Date(e.scheduled_at).getTime() / 1000)}:f>`
+  );
+  embed.setDescription(lines.join('\n').slice(0, 4000));
+  return embed;
+}
+
+export function eventDetailEmbed(event, participants, withRoles = false) {
+  const isActive = event?.status === 'active';
+  let roleSummary = '';
+  if (withRoles) {
+    const roleBuckets = {
+      Tanque: [],
+      Healer: [],
+      Flamigero: [],
+      'Shadow Caller': [],
+      Otros: []
+    };
+    for (const p of participants) {
+      const role = roleBuckets[p.role] ? p.role : 'Otros';
+      roleBuckets[role].push(p.user_id);
+    }
+    roleSummary = Object.entries(roleBuckets)
+      .filter(([, users]) => users.length > 0)
+      .map(([role, users]) => `**${role}:** ${users.length}`)
+      .join(' · ') || 'Sin participantes';
+  }
+
+  return new EmbedBuilder()
+    .setColor(isActive ? COLORS.primary : COLORS.info)
+    .setTitle(`${event.name || event.activity_type} · #${event.id}`)
+    .setDescription(
+      withRoles
+        ? `Estado: **${event.status}**\nFecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\nCupos: **${participants.length}/${event.max_participants}**\nRoles: ${roleSummary}`
+        : `Estado: **${event.status}**\nFecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\nCupos: **${participants.length}/${event.max_participants}**`
+    )
+    .addFields({
+      name: 'Participantes',
+      value: participants.length
+        ? (withRoles
+          ? participants.map((p) => `<@${p.user_id}> (${p.role || 'Otros'})`).join(', ').slice(0, 1024)
+          : participants.map((p) => `<@${p.user_id}>`).join(', ').slice(0, 1024))
+        : 'Sin participantes',
+      inline: false
+    })
+    .setTimestamp();
+}

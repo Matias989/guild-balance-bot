@@ -2,6 +2,16 @@
 
 Panel con botones: cada miembro ve su saldo y movimientos. Oficiales y administradores (roles o IDs configurados) pueden ingresar o retirar silver, ver resumen del gremio y movimientos recientes.
 
+Ahora incluye un **sistema de eventos**:
+
+- Crear evento por tipo de actividad (Mazmorra, Avalonian, ZvZ, Hellgate, Recoleccion, Otro)
+- Inscripcion y baja de participantes desde panel
+- Roles por participante solo para eventos de tipo **Grupal**: **Tanque**, **Healer**, **Flamigero**, **Shadow Caller** y **Otros**
+- Cierre de evento con seleccion de asistentes
+- Reparto automatico del loot entre asistentes en sus cuentas corrientes
+- **Sin comision al gremio**: el total del loot se divide entre los asistentes
+- Si el creador del evento **no es staff**, el evento se crea **sin impacto contable** (se puede crear/cerrar, pero no modifica saldos al cerrar)
+
 ## Requisitos
 
 - Node.js 18+
@@ -35,7 +45,16 @@ npm run dev
 
 ### Panel y permisos
 
-En el canal: **Mi cuenta** y **Resumen gremio** los usa cualquier miembro. **Más opciones** abre acciones solo para oficiales (agregar/quitar silver y movimientos); si un miembro común lo pulsa, recibe un aviso efímero sin permiso.
+En el canal: **Mi cuenta**, **Resumen gremio** y **Eventos** los usa cualquier miembro.
+
+**Mas opciones** abre acciones solo para oficiales:
+
+- Crear evento
+- Cerrar evento (seleccionar asistentes y loot total)
+- Agregar / quitar silver manual
+- Ver movimientos
+
+Si un miembro comun intenta usar opciones staff, recibe un aviso efimero sin permiso.
 
 ### Datos
 

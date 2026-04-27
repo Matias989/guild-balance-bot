@@ -8,7 +8,18 @@ import {
   deductFromBalance,
   getAllUserBalances,
   getGuildBalanceAggregate,
-  getRecentGuildTransactions
+  getRecentGuildTransactions,
+  getActivityTypes,
+  createEvent,
+  getActiveEvents,
+  getEvent,
+  getEventParticipants,
+  joinEvent,
+  leaveEvent,
+  getClosableEvents,
+  closeEvent,
+  updateParticipantRole,
+  isGroupEvent
 } from '../database/services.js';
 import {
   myAccountEmbed,
@@ -16,9 +27,21 @@ import {
   guildMovementsEmbed,
   staffPromptEmbed,
   successEmbed,
-  errorEmbed
+  errorEmbed,
+  eventsListEmbed,
+  eventDetailEmbed
 } from '../utils/embeds.js';
-import { PREFIX, staffUserSelectRow, staffMoreRows } from '../utils/components.js';
+import {
+  PREFIX,
+  staffUserSelectRow,
+  staffMoreRows,
+  eventsListRows,
+  eventDetailRows,
+  closeEventSelectRows,
+  closeAttendeesRows,
+  createEventActivitySelect,
+  mainPanelRows
+} from '../utils/components.js';
 import { setStaffState, getStaffState, clearStaffState } from '../utils/staffState.js';
 
 function useUpdate(interaction) {
@@ -40,6 +63,7 @@ function isStaff(interaction, guildId) {
 export async function handleInteraction(interaction) {
   if (
     !interaction.isButton() &&
+    !interaction.isStringSelectMenu() &&
     !interaction.isUserSelectMenu() &&
     !interaction.isModalSubmit()
   ) {
@@ -115,6 +139,69 @@ export async function handleInteraction(interaction) {
       return;
     }
 
+    if (interaction.isButton() && customId === `${PREFIX}events`) {
+      const events = getActiveEvents(guildId);
+      const payload = {
+        embeds: [eventsListEmbed(events)],
+        components: eventsListRows(events),
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
+    if (interaction.isButton() && customId === `${PREFIX}create_event`) {
+      const select = createEventActivitySelect(getActivityTypes());
+      const payload = {
+        embeds: [staffPromptEmbed('Crear evento', 'Selecciona el tipo de actividad para continuar.')],
+        components: [
+          new ActionRowBuilder().addComponents(select),
+          ...eventsListRows(getActiveEvents(guildId)).slice(1, 2)
+        ],
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
+    if (interaction.isButton() && customId === `${PREFIX}close_event`) {
+      const allActive = getClosableEvents(guildId);
+      const isUserStaff = isStaff(interaction, guildId);
+      const events = isUserStaff ? allActive : allActive.filter((e) => e.creator_id === userId);
+      if (!events.length) {
+        const payload = {
+          embeds: [errorEmbed('Sin eventos', isUserStaff
+            ? 'No hay eventos activos para cerrar.'
+            : 'No tienes eventos activos creados por ti para cerrar.')],
+          ephemeral: true
+        };
+        if (useUpdate(interaction)) await interaction.update(payload);
+        else await interaction.reply(payload);
+        return;
+      }
+      const payload = {
+        embeds: [staffPromptEmbed('Cerrar evento', 'Selecciona un evento y luego quienes asistieron.')],
+        components: closeEventSelectRows(events),
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
+    if (interaction.isButton() && customId === `${PREFIX}back_main`) {
+      const payload = {
+        embeds: [staffPromptEmbed('Panel principal', 'Elegi una opcion del panel.')],
+        components: mainPanelRows(),
+        ephemeral: true
+      };
+      if (useUpdate(interaction)) await interaction.update(payload);
+      else await interaction.reply(payload);
+      return;
+    }
+
     if (interaction.isButton() && customId === `${PREFIX}cancel`) {
       clearStaffState(userId);
       const payload = {
@@ -130,7 +217,9 @@ export async function handleInteraction(interaction) {
     const staffButtons = new Set([
       `${PREFIX}staff_add`,
       `${PREFIX}staff_remove`,
-      `${PREFIX}staff_movements`
+      `${PREFIX}staff_movements`,
+      `${PREFIX}staff_create_event`,
+      `${PREFIX}staff_close_event`
     ]);
 
     if (interaction.isButton() && staffButtons.has(customId)) {
@@ -190,6 +279,188 @@ export async function handleInteraction(interaction) {
         else await interaction.reply(payload);
         return;
       }
+
+      if (customId === `${PREFIX}staff_create_event`) {
+        const select = createEventActivitySelect(getActivityTypes());
+        const payload = {
+          embeds: [staffPromptEmbed('Crear evento', 'Selecciona el tipo de actividad para continuar.')],
+          components: [
+            new ActionRowBuilder().addComponents(select),
+            ...staffMoreRows().slice(1, 2)
+          ],
+          ephemeral: true
+        };
+        if (useUpdate(interaction)) await interaction.update(payload);
+        else await interaction.reply(payload);
+        return;
+      }
+
+      if (customId === `${PREFIX}staff_close_event`) {
+        const events = getClosableEvents(guildId);
+        if (!events.length) {
+          const payload = {
+            embeds: [errorEmbed('Sin eventos', 'No hay eventos activos para cerrar.')],
+            ephemeral: true
+          };
+          if (useUpdate(interaction)) await interaction.update(payload);
+          else await interaction.reply(payload);
+          return;
+        }
+        const payload = {
+          embeds: [staffPromptEmbed('Cerrar evento', 'Selecciona un evento y luego quienes asistieron.')],
+          components: closeEventSelectRows(events),
+          ephemeral: true
+        };
+        if (useUpdate(interaction)) await interaction.update(payload);
+        else await interaction.reply(payload);
+        return;
+      }
+    }
+
+    if (interaction.isStringSelectMenu() && customId === `${PREFIX}event_select`) {
+      const eventId = parseInt(interaction.values[0], 10);
+      const event = getEvent(eventId);
+      if (!event) {
+        await interaction.update({ embeds: [errorEmbed('Error', 'Evento no encontrado.')], components: [], ephemeral: true });
+        return;
+      }
+      const participants = getEventParticipants(eventId);
+      const isParticipant = participants.some((p) => p.user_id === userId);
+      await interaction.update({
+        embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
+        components: eventDetailRows(eventId, isParticipant, isGroupEvent(event)),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && customId.startsWith(`${PREFIX}event_role:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      const selectedRole = interaction.values[0] || 'Otros';
+      const event = getEvent(eventId);
+      if (!event || event.status !== 'active') {
+        await interaction.update({
+          embeds: [errorEmbed('Evento no disponible', 'El evento no existe o ya se cerro.')],
+          components: [],
+          ephemeral: true
+        });
+        return;
+      }
+      if (!isGroupEvent(event)) {
+        await interaction.reply({
+          embeds: [errorEmbed('No aplica', 'La seleccion de roles solo esta disponible para eventos de tipo Grupal.')],
+          ephemeral: true
+        });
+        return;
+      }
+
+      const participantsBefore = getEventParticipants(eventId);
+      const alreadyIn = participantsBefore.some((p) => p.user_id === userId);
+      if (alreadyIn) {
+        updateParticipantRole(eventId, userId, selectedRole);
+      } else {
+        const joinResult = joinEvent(eventId, userId, guildId, selectedRole);
+        if (!joinResult.ok) {
+          await interaction.reply({
+            embeds: [errorEmbed('No se pudo unir', joinResult.reason)],
+            ephemeral: true
+          });
+          return;
+        }
+      }
+
+      const participants = getEventParticipants(eventId);
+      await interaction.update({
+        embeds: [successEmbed('Rol actualizado', `Quedaste como **${selectedRole}**.`), eventDetailEmbed(event, participants, true)],
+        components: eventDetailRows(eventId, true, true),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && customId === `${PREFIX}create_event_type`) {
+      const activityType = interaction.values[0];
+      setStaffState(userId, { flow: 'create_event', activityType });
+      await interaction.showModal(buildCreateEventModal(activityType, isStaff(interaction, guildId)));
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && customId === `${PREFIX}close_event_select`) {
+      const eventId = parseInt(interaction.values[0], 10);
+      const event = getEvent(eventId);
+      const canClose = !!event && (isStaff(interaction, guildId) || event.creator_id === userId);
+      if (!canClose) {
+        await interaction.update({
+          embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
+          components: [],
+          ephemeral: true
+        });
+        return;
+      }
+      const participants = getEventParticipants(eventId);
+      if (!participants.length) {
+        await interaction.update({
+          embeds: [errorEmbed('Sin participantes', 'No se puede cerrar sin participantes.')],
+          components: [],
+          ephemeral: true
+        });
+        return;
+      }
+      const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      await interaction.update({
+        embeds: [staffPromptEmbed('Asistentes', 'Selecciona quienes asistieron al evento.')],
+        components: closeAttendeesRows(eventId, participantsWithNames),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isStringSelectMenu() && customId.startsWith(`${PREFIX}close_attendees:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      const event = getEvent(eventId);
+      const canClose = !!event && (isStaff(interaction, guildId) || event.creator_id === userId);
+      if (!canClose) {
+        await interaction.reply({
+          embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
+          ephemeral: true
+        });
+        return;
+      }
+      setStaffState(userId, { flow: 'close_event', eventId, attendedIds: interaction.values });
+      await interaction.showModal(buildCloseEventLootModal(eventId));
+      return;
+    }
+
+    if (interaction.isButton() && customId.startsWith(`${PREFIX}join_event:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      const result = joinEvent(eventId, userId, guildId);
+      if (!result.ok) {
+        await interaction.reply({ embeds: [errorEmbed('No se pudo unir', result.reason)], ephemeral: true });
+        return;
+      }
+      const event = getEvent(eventId);
+      const participants = getEventParticipants(eventId);
+      await interaction.reply({
+        embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isButton() && customId.startsWith(`${PREFIX}leave_event:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      const left = leaveEvent(eventId, userId);
+      if (!left) {
+        await interaction.reply({ embeds: [errorEmbed('No estabas inscripto', 'No figurabas como participante.')], ephemeral: true });
+        return;
+      }
+      const event = getEvent(eventId);
+      const participants = getEventParticipants(eventId);
+      await interaction.reply({
+        embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
+        ephemeral: true
+      });
+      return;
     }
 
     if (interaction.isUserSelectMenu() && customId.startsWith(`${PREFIX}staff_user:`)) {
@@ -325,6 +596,82 @@ export async function handleInteraction(interaction) {
       });
       return;
     }
+
+    if (interaction.isModalSubmit() && customId === `${PREFIX}create_event_modal`) {
+      const state = getStaffState(userId);
+      if (!state || state.flow !== 'create_event') {
+        await interaction.reply({ embeds: [errorEmbed('Sesion expirada', 'Volve a abrir Crear evento.')], ephemeral: true });
+        return;
+      }
+      const dateTimeStr = interaction.fields.getTextInputValue('event_datetime');
+      const maxPart = parseInt(interaction.fields.getTextInputValue('event_max') || '8', 10);
+      const name = (interaction.fields.getTextInputValue('event_name') || '').trim();
+      const scheduledAt = parseDateTimeInput(dateTimeStr);
+      if (!scheduledAt) {
+        await interaction.reply({
+          embeds: [errorEmbed('Fecha invalida', 'Usa formato DD/MM/AAAA HH:MM (UTC).')],
+          ephemeral: true
+        });
+        return;
+      }
+
+      const creatorIsStaff = isStaff(interaction, guildId);
+      let affectsAccounting = false;
+      if (creatorIsStaff) {
+        const accountingRaw = (interaction.fields.getTextInputValue('event_accounting') || 'si').trim().toLowerCase();
+        affectsAccounting = /^(si|sí|yes|true|1)$/.test(accountingRaw);
+      }
+      const eventId = createEvent(guildId, userId, {
+        activityType: state.activityType,
+        name: name || state.activityType,
+        scheduledAt: scheduledAt.toISOString(),
+        maxParticipants: maxPart,
+        affectsAccounting
+      });
+      clearStaffState(userId);
+      await interaction.reply({
+        embeds: [successEmbed('Evento creado', creatorIsStaff
+          ? `Evento #${eventId} creado con impacto contable: **${affectsAccounting ? 'SI' : 'NO'}**.`
+          : `Evento #${eventId} creado sin impacto contable (creador no staff).`)],
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isModalSubmit() && customId === `${PREFIX}close_event_loot`) {
+      const state = getStaffState(userId);
+      if (!state || state.flow !== 'close_event') {
+        await interaction.reply({ embeds: [errorEmbed('Sesion expirada', 'Volve a seleccionar el evento.')], ephemeral: true });
+        return;
+      }
+      const event = getEvent(state.eventId);
+      const canClose = !!event && (isStaff(interaction, guildId) || event.creator_id === userId);
+      if (!canClose) {
+        await interaction.reply({ embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')], ephemeral: true });
+        return;
+      }
+      const lootRaw = interaction.fields.getTextInputValue('loot_total').replace(',', '.').trim();
+      const loot = parseFloat(lootRaw || '0') || 0;
+      const result = closeEvent(state.eventId, state.attendedIds, loot, userId);
+      clearStaffState(userId);
+      if (!result.ok) {
+        await interaction.reply({ embeds: [errorEmbed('No se pudo cerrar', result.reason)], ephemeral: true });
+        return;
+      }
+
+      await interaction.reply({
+        embeds: [
+          successEmbed(
+            'Evento cerrado',
+            result.affectsAccounting
+              ? `Asistentes: **${result.attendedCount}**\nLoot total: **${result.totalLoot.toLocaleString('es-ES')}** silver\nReparto por persona: **${result.sharePerUser.toLocaleString('es-ES')}** silver\n\nSin comision al gremio: se reparte todo entre asistentes.`
+              : `Asistentes: **${result.attendedCount}**\nEvento cerrado sin impacto contable (creado por usuario no staff).`
+          )
+        ],
+        ephemeral: true
+      });
+      return;
+    }
   } catch (err) {
     console.error('Interaction error:', err);
     const fallback = {
@@ -337,6 +684,18 @@ export async function handleInteraction(interaction) {
       await interaction.reply(fallback).catch(() => {});
     }
   }
+}
+
+async function enrichParticipantsWithNames(guild, participants) {
+  if (!guild || !participants?.length) return participants.map((p) => ({ ...p, displayName: null }));
+  return Promise.all(participants.map(async (p) => {
+    try {
+      const member = await guild.members.fetch(p.user_id).catch(() => null);
+      return { ...p, displayName: member?.displayName || member?.user?.username || null };
+    } catch {
+      return { ...p, displayName: null };
+    }
+  }));
 }
 
 function buildAddModal() {
@@ -386,4 +745,81 @@ function buildRemoveModal(targetUserId, guildId) {
           .setMaxLength(500)
       )
     );
+}
+
+function buildCreateEventModal(activityType, canChooseAccounting = false) {
+  const rows = [
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_name')
+        .setLabel('Nombre (opcional)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_datetime')
+        .setLabel('Fecha y hora UTC (DD/MM/AAAA HH:MM)')
+        .setStyle(TextInputStyle.Short)
+        .setPlaceholder('15/05/2026 21:00')
+        .setRequired(true)
+    ),
+    new ActionRowBuilder().addComponents(
+      new TextInputBuilder()
+        .setCustomId('event_max')
+        .setLabel('Cupo maximo')
+        .setStyle(TextInputStyle.Short)
+        .setValue('8')
+        .setRequired(true)
+    )
+  ];
+
+  if (canChooseAccounting) {
+    rows.push(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('event_accounting')
+          .setLabel('Impacta cuentas? (si/no)')
+          .setStyle(TextInputStyle.Short)
+          .setValue('si')
+          .setRequired(false)
+      )
+    );
+  }
+
+  return new ModalBuilder()
+    .setCustomId(`${PREFIX}create_event_modal`)
+    .setTitle(`Nuevo evento: ${activityType}`.slice(0, 45))
+    .addComponents(...rows);
+}
+
+function buildCloseEventLootModal(eventId) {
+  return new ModalBuilder()
+    .setCustomId(`${PREFIX}close_event_loot`)
+    .setTitle(`Cerrar evento #${eventId}`)
+    .addComponents(
+      new ActionRowBuilder().addComponents(
+        new TextInputBuilder()
+          .setCustomId('loot_total')
+          .setLabel('Loot total (silver)')
+          .setStyle(TextInputStyle.Short)
+          .setValue('0')
+          .setRequired(false)
+      )
+    );
+}
+
+function parseDateTimeInput(input) {
+  const [dateStr, timeStr] = input.includes(' ') ? input.split(' ') : [input, '20:00'];
+  const [d, m, y] = (dateStr || '').split('/').map(Number);
+  const [h, min] = (timeStr || '20:00').split(':').map(Number);
+  if (!d || !m || !y || Number.isNaN(h) || Number.isNaN(min)) return null;
+  const date = new Date(Date.UTC(y, m - 1, d, h, min, 0));
+  if (Number.isNaN(date.getTime())) return null;
+  if (
+    date.getUTCFullYear() !== y ||
+    date.getUTCMonth() !== (m - 1) ||
+    date.getUTCDate() !== d
+  ) return null;
+  return date;
 }
