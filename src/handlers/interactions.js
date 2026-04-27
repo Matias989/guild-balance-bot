@@ -369,6 +369,19 @@ export async function handleInteraction(interaction) {
       }
 
       const participantsBefore = getEventParticipants(eventId);
+      // En grupales, cada rol clave debe ser único (excepto "Otros").
+      if (selectedRole !== 'Otros') {
+        const takenByAnother = participantsBefore.some(
+          (p) => p.role === selectedRole && p.user_id !== userId
+        );
+        if (takenByAnother) {
+          await interaction.reply({
+            embeds: [errorEmbed('Rol ocupado', `El rol **${selectedRole}** ya está asignado. Elige otro rol u **Otros**.`)],
+            ephemeral: true
+          });
+          return;
+        }
+      }
       const alreadyIn = participantsBefore.some((p) => p.user_id === userId);
       if (alreadyIn) {
         updateParticipantRole(eventId, userId, selectedRole);

@@ -187,10 +187,17 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
       const role = roleBuckets[p.role] ? p.role : 'Otros';
       roleBuckets[role].push(p.user_id);
     }
+    const roleIcon = {
+      Tanque: '🛡️',
+      Healer: '💚',
+      Flamigero: '🔥',
+      'Shadow Caller': '🌑',
+      Otros: '👥'
+    };
     roleSummary = Object.entries(roleBuckets)
       .filter(([, users]) => users.length > 0)
-      .map(([role, users]) => `**${role}:** ${users.length}`)
-      .join(' · ') || 'Sin participantes';
+      .map(([role, users]) => `• ${roleIcon[role] || '👤'} **${role}:** ${users.map((id) => `<@${id}>`).join(', ')}`)
+      .join('\n') || 'Sin participantes';
   }
 
   return new EmbedBuilder()
@@ -198,7 +205,7 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
     .setTitle(`🎯 ${event.name || event.activity_type} · #${event.id}`)
     .setDescription(
       withRoles
-        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**\n🧩 Roles: ${roleSummary}`
+        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**\n\n${roleSummary}`
         : `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**`
     )
     .addFields({
