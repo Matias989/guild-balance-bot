@@ -213,9 +213,9 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
     .setTimestamp();
 }
 
-export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds) {
+export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds, affectsAccounting = true) {
   const participantsList = attendedIds.map((id) => `<@${id}>`).join(', ');
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(COLORS.success)
     .setTitle(`📦 Reparto de loot - Evento #${event.id} - ${event.activity_type}`)
     .addFields(
@@ -225,4 +225,12 @@ export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attended
       { name: 'Participantes que recibieron loot', value: participantsList || '—', inline: false }
     )
     .setTimestamp();
+  if (!affectsAccounting) {
+    embed.addFields({
+      name: 'ℹ️ Modo informativo',
+      value: 'Este evento fue cerrado sin impacto contable. El reparto mostrado es solo referencia.',
+      inline: false
+    });
+  }
+  return embed;
 }

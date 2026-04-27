@@ -814,14 +814,15 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, state.eventId).catch(() => {});
 
       const lootChannelId = process.env.EVENTS_CHANNEL_LOOT_ID;
-      if (result.affectsAccounting && lootChannelId && result.totalLoot > 0 && result.attendedUserIds.length > 0) {
+      if (lootChannelId && result.totalLoot > 0 && result.attendedUserIds.length > 0) {
         try {
           const channel = await interaction.client.channels.fetch(lootChannelId).catch(() => null);
           if (channel) {
             const content = result.attendedUserIds.map((id) => `<@${id}>`).join(' ');
+            const shareForDisplay = result.attendedCount > 0 ? (result.totalLoot / result.attendedCount) : 0;
             await channel.send({
               content,
-              embeds: [lootDistributionEmbed(result.event, result.totalLoot, result.sharePerUser, result.attendedUserIds)]
+              embeds: [lootDistributionEmbed(result.event, result.totalLoot, shareForDisplay, result.attendedUserIds, result.affectsAccounting)]
             });
           }
         } catch (err) {
