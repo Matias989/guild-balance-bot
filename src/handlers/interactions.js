@@ -814,6 +814,7 @@ function buildCreateEventModal(activityType, canChooseAccounting = false) {
         .setLabel('Fecha y hora UTC (DD/MM/AAAA HH:MM)')
         .setStyle(TextInputStyle.Short)
         .setPlaceholder('15/05/2026 21:00')
+        .setValue(formatDateTimeUTC())
         .setRequired(true)
     ),
     new ActionRowBuilder().addComponents(
@@ -843,6 +844,16 @@ function buildCreateEventModal(activityType, canChooseAccounting = false) {
     .setCustomId(`${PREFIX}create_event_modal`)
     .setTitle(`Nuevo evento: ${activityType}`.slice(0, 45))
     .addComponents(...rows);
+}
+
+function formatDateTimeUTC() {
+  const now = new Date();
+  const d = now.getUTCDate().toString().padStart(2, '0');
+  const m = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+  const y = now.getUTCFullYear();
+  const h = now.getUTCHours().toString().padStart(2, '0');
+  const min = now.getUTCMinutes().toString().padStart(2, '0');
+  return `${d}/${m}/${y} ${h}:${min}`;
 }
 
 function buildCloseEventLootModal(eventId) {
