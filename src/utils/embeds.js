@@ -7,6 +7,17 @@ const COLORS = {
   info: 0x5865f2
 };
 
+function formatDateTimeUTC(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Fecha inválida';
+  const d = date.getUTCDate().toString().padStart(2, '0');
+  const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const y = date.getUTCFullYear();
+  const h = date.getUTCHours().toString().padStart(2, '0');
+  const min = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${d}/${m}/${y} ${h}:${min} UTC`;
+}
+
 export function mainPanelEmbed(guildName) {
   return new EmbedBuilder()
     .setColor(COLORS.primary)
@@ -166,7 +177,7 @@ export function eventsListEmbed(events) {
   }
 
   const lines = events.map((e) =>
-    `#${e.id} · **${e.activity_type}** · <t:${Math.floor(new Date(e.scheduled_at).getTime() / 1000)}:f>`
+    `#${e.id} · **${e.activity_type}** · ${formatDateTimeUTC(e.scheduled_at)}`
   );
   embed.setDescription(lines.join('\n').slice(0, 4000));
   return embed;
@@ -174,45 +185,27 @@ export function eventsListEmbed(events) {
 
 export function eventDetailEmbed(event, participants, withRoles = false) {
   const isActive = event?.status === 'active';
-  let roleSummary = '';
-  if (withRoles) {
-    const roleBuckets = {
-      Tanque: [],
-      Healer: [],
-      Flamigero: [],
-      'Shadow Caller': [],
-      Otros: []
-    };
-    for (const p of participants) {
-      const role = roleBuckets[p.role] ? p.role : 'Otros';
-      roleBuckets[role].push(p.user_id);
-    }
-    const roleIcon = {
-      Tanque: '🛡️',
-      Healer: '💚',
-      Flamigero: '🔥',
-      'Shadow Caller': '🌑',
-      Otros: '👥'
-    };
-    roleSummary = Object.entries(roleBuckets)
-      .filter(([, users]) => users.length > 0)
-      .map(([role, users]) => `• ${roleIcon[role] || '👤'} **${role}:** ${users.map((id) => `<@${id}>`).join(', ')}`)
-      .join('\n') || 'Sin participantes';
-  }
+  const roleIcon = {
+    Tanque: '🛡️',
+    Healer: '💚',
+    Flamigero: '🔥',
+    'Shadow Caller': '🌑',
+    Otros: '👥'
+  };
 
   return new EmbedBuilder()
     .setColor(isActive ? COLORS.primary : COLORS.info)
     .setTitle(`🎯 ${event.name || event.activity_type} · #${event.id}`)
     .setDescription(
       withRoles
-        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**\n\n${roleSummary}`
-        : `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**`
+        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: ${formatDateTimeUTC(event.scheduled_at)}\n👥 Cupos: **${participants.length}/${event.max_participants}**`
+        : `🟢 Estado: **${event.status}**\n🕒 Fecha: ${formatDateTimeUTC(event.scheduled_at)}\n👥 Cupos: **${participants.length}/${event.max_participants}**`
     )
     .addFields({
       name: '👤 Participantes',
       value: participants.length
         ? (withRoles
-          ? participants.map((p) => `<@${p.user_id}> (${p.role || 'Otros'})`).join(', ').slice(0, 1024)
+          ? participants.map((p) => `${roleIcon[p.role] || roleIcon.Otros} <@${p.user_id}>`).join('\n').slice(0, 1024)
           : participants.map((p) => `<@${p.user_id}>`).join(', ').slice(0, 1024))
         : 'Sin participantes',
       inline: false

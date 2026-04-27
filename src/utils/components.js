@@ -8,6 +8,17 @@ import {
 
 export const PREFIX = 'bal_';
 
+function formatDateTimeUTC(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Fecha inválida';
+  const d = date.getUTCDate().toString().padStart(2, '0');
+  const m = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const y = date.getUTCFullYear();
+  const h = date.getUTCHours().toString().padStart(2, '0');
+  const min = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${d}/${m}/${y} ${h}:${min} UTC`;
+}
+
 export function mainPanelRows() {
   return [
     new ActionRowBuilder().addComponents(
@@ -88,7 +99,7 @@ export function eventsListRows(events) {
     .setCustomId(`${PREFIX}event_select`)
     .setPlaceholder('Selecciona un evento...')
     .addOptions(events.slice(0, 25).map((e) => ({
-      label: `${e.activity_type} - ${new Date(e.scheduled_at).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}`,
+      label: `${e.activity_type} - ${formatDateTimeUTC(e.scheduled_at)}`,
       value: String(e.id),
       description: `${e.max_participants} cupos`
     })));
@@ -150,7 +161,7 @@ export function closeEventSelectRows(events) {
     .addOptions(events.slice(0, 25).map((e) => ({
       label: `#${e.id} ${e.activity_type}`,
       value: String(e.id),
-      description: new Date(e.scheduled_at).toLocaleString('es-ES')
+      description: formatDateTimeUTC(e.scheduled_at)
     })));
   return [
     new ActionRowBuilder().addComponents(select),
