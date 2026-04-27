@@ -166,19 +166,34 @@ export function closeEventSelectRows(events) {
 }
 
 export function closeAttendeesRows(eventId, participants) {
+  const options = [];
+  const canUseAllOption = participants.length <= 24;
+  if (canUseAllOption) {
+    options.push({
+      label: 'Todos',
+      value: '__all__',
+      description: 'Marcar asistencia completa'
+    });
+  }
+  options.push(...participants.slice(0, 25).map((p, i) => ({
+    label: (p.displayName || `Participante ${i + 1}`).slice(0, 100),
+    value: p.user_id,
+    default: true
+  })));
+
   const select = new StringSelectMenuBuilder()
     .setCustomId(`${PREFIX}close_attendees:${eventId}`)
-    .setPlaceholder('Selecciona quienes asistieron...')
-    .setMinValues(1)
-    .setMaxValues(Math.max(1, Math.min(25, participants.length)))
-    .addOptions(participants.slice(0, 25).map((p, i) => ({
-      label: (p.displayName || `Participante ${i + 1}`).slice(0, 100),
-      value: p.user_id,
-      default: true
-    })));
+    .setPlaceholder('Selecciona quienes asistieron (o elige Todos)...')
+    .setMinValues(0)
+    .setMaxValues(Math.max(1, Math.min(25, canUseAllOption ? participants.length : options.length)))
+    .addOptions(options);
   return [
     new ActionRowBuilder().addComponents(select),
     new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${PREFIX}finalize_close:${eventId}`)
+        .setLabel('Finalizar evento')
+        .setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`${PREFIX}cancel`).setLabel('Cancelar').setStyle(ButtonStyle.Secondary)
     )
   ];

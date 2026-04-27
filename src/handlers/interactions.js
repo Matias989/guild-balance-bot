@@ -506,7 +506,45 @@ export async function handleInteraction(interaction) {
         });
         return;
       }
-      setStaffState(userId, { flow: 'close_event', eventId, attendedIds: interaction.values });
+      const participants = getEventParticipants(eventId);
+      const participantIds = participants.map((p) => p.user_id);
+      const selected = interaction.values || [];
+      const attendedIds = selected.includes('__all__') ? participantIds : selected.filter((id) => id !== '__all__');
+      setStaffState(userId, { flow: 'close_event', eventId, attendedIds });
+      const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      await interaction.update({
+        embeds: [
+          staffPromptEmbed(
+            'Asistentes seleccionados',
+            attendedIds.length
+              ? `Asistentes marcados: **${attendedIds.length}**. Pulsa **Finalizar evento** para cargar el loot.`
+              : 'No hay asistentes marcados. Pulsa **Finalizar evento** para continuar igualmente.'
+          )
+        ],
+        components: closeAttendeesRows(eventId, participantsWithNames),
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.isButton() && customId.startsWith(`${PREFIX}finalize_close:`)) {
+      const eventId = parseInt(customId.split(':')[1], 10);
+      const event = getEvent(eventId);
+      const canClose = !!event && (isStaff(interaction, guildId) || event.creator_id === userId);
+      if (!canClose) {
+        await interaction.reply({
+          embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
+          ephemeral: true
+        });
+        return;
+      }
+      const participants = getEventParticipants(eventId);
+      const state = getStaffState(userId);
+      const selected = state && state.flow === 'close_event' && state.eventId === eventId
+        ? (state.attendedIds || [])
+        : [];
+      const attendedIds = selected.length ? selected : participants.map((p) => p.user_id);
+      setStaffState(userId, { flow: 'close_event', eventId, attendedIds });
       await interaction.showModal(buildCloseEventLootModal(eventId));
       return;
     }
