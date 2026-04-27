@@ -507,9 +507,8 @@ export async function handleInteraction(interaction) {
         return;
       }
       const participants = getEventParticipants(eventId);
-      const participantIds = participants.map((p) => p.user_id);
       const selected = interaction.values || [];
-      const attendedIds = selected.includes('__all__') ? participantIds : selected.filter((id) => id !== '__all__');
+      const attendedIds = selected;
       setStaffState(userId, { flow: 'close_event', eventId, attendedIds });
       const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
       await interaction.update({
@@ -518,7 +517,7 @@ export async function handleInteraction(interaction) {
             'Asistentes seleccionados',
             attendedIds.length
               ? `Asistentes marcados: **${attendedIds.length}**. Pulsa **Finalizar evento** para cargar el loot.`
-              : 'No hay asistentes marcados. Pulsa **Finalizar evento** para continuar igualmente.'
+              : 'No hay asistentes marcados. Selecciona al menos uno para continuar.'
           )
         ],
         components: closeAttendeesRows(eventId, participantsWithNames),

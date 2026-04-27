@@ -10,21 +10,28 @@ const COLORS = {
 export function mainPanelEmbed(guildName) {
   return new EmbedBuilder()
     .setColor(COLORS.primary)
-    .setTitle(`Cuenta corriente — ${guildName || 'Gremio'}`)
+    .setTitle(`🏛️ Panel de Gremio — ${guildName || 'Gremio'}`)
     .setDescription(
-      '**Mi cuenta** y **Resumen gremio** están disponibles para todos. Oficiales y administradores usan **Más opciones** para agregar o quitar silver y ver movimientos del gremio.'
+      [
+        'Bienvenido al panel principal.',
+        '',
+        '• **Mi cuenta**: saldo e historial personal',
+        '• **Resumen gremio**: visión global de cuentas',
+        '• **Eventos**: inscripción, gestión y cierre',
+        '• **Más opciones**: acciones de staff'
+      ].join('\n')
     )
-    .setFooter({ text: 'Silver en cuenta corriente (referencia in-game).' })
+    .setFooter({ text: 'Sistema contable de silver (referencia in-game).' })
     .setTimestamp();
 }
 
 export function myAccountEmbed(userId, balance, history) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.info)
-    .setTitle('Tu cuenta corriente')
+    .setTitle('💳 Tu cuenta corriente')
     .setDescription(`<@${userId}>`)
     .addFields({
-      name: 'Saldo actual',
+      name: '💰 Saldo actual',
       value: `**${Number(balance).toLocaleString('es-ES')}** silver`,
       inline: false
     })
@@ -40,7 +47,7 @@ export function myAccountEmbed(userId, balance, history) {
       return `${s} — ${h.reason || h.type}${who}`;
     });
     embed.addFields({
-      name: 'Últimos movimientos',
+      name: '🧾 Últimos movimientos',
       value: lines.join('\n').slice(0, 4096) || '—',
       inline: false
     });
@@ -51,22 +58,22 @@ export function myAccountEmbed(userId, balance, history) {
 export function guildSummaryEmbed(accounts, aggregate) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.info)
-    .setTitle('Resumen del gremio')
+    .setTitle('📊 Resumen del gremio')
     .setTimestamp();
 
   embed.addFields(
     {
-      name: 'Total en cuentas',
+      name: '💰 Total en cuentas',
       value: `**${Number(aggregate.totalBalance).toLocaleString('es-ES')}** silver`,
       inline: true
     },
     {
-      name: 'Miembros registrados',
+      name: '👤 Miembros registrados',
       value: `${aggregate.registeredUsers}`,
       inline: true
     },
     {
-      name: 'Con saldo > 0',
+      name: '✅ Con saldo > 0',
       value: `${aggregate.accountsWithPositiveBalance}`,
       inline: true
     }
@@ -74,7 +81,7 @@ export function guildSummaryEmbed(accounts, aggregate) {
 
   if (!accounts?.length) {
     embed.addFields({
-      name: 'Cuentas con saldo',
+      name: '💳 Cuentas con saldo',
       value: 'Ninguna por ahora.',
       inline: false
     });
@@ -98,7 +105,7 @@ export function guildSummaryEmbed(accounts, aggregate) {
   if (chunk) chunks.push(chunk);
   for (let i = 0; i < chunks.length && i < 4; i++) {
     embed.addFields({
-      name: i === 0 ? 'Ranking por saldo' : '\u200b',
+      name: i === 0 ? '🏆 Ranking por saldo' : '\u200b',
       value: chunks[i],
       inline: false
     });
@@ -110,7 +117,7 @@ export function guildSummaryEmbed(accounts, aggregate) {
 export function guildMovementsEmbed(rows) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.primary)
-    .setTitle('Últimos movimientos (todo el gremio)')
+    .setTitle('📜 Últimos movimientos del gremio')
     .setTimestamp();
 
   if (!rows?.length) {
@@ -134,7 +141,7 @@ export function guildMovementsEmbed(rows) {
 export function staffPromptEmbed(title, description) {
   return new EmbedBuilder()
     .setColor(COLORS.primary)
-    .setTitle(title)
+    .setTitle(`⚙️ ${title}`)
     .setDescription(description)
     .setTimestamp();
 }
@@ -150,7 +157,7 @@ export function errorEmbed(title, description) {
 export function eventsListEmbed(events) {
   const embed = new EmbedBuilder()
     .setColor(COLORS.info)
-    .setTitle('Eventos activos')
+    .setTitle('📅 Eventos activos')
     .setTimestamp();
 
   if (!events?.length) {
@@ -188,14 +195,14 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
 
   return new EmbedBuilder()
     .setColor(isActive ? COLORS.primary : COLORS.info)
-    .setTitle(`${event.name || event.activity_type} · #${event.id}`)
+    .setTitle(`🎯 ${event.name || event.activity_type} · #${event.id}`)
     .setDescription(
       withRoles
-        ? `Estado: **${event.status}**\nFecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\nCupos: **${participants.length}/${event.max_participants}**\nRoles: ${roleSummary}`
-        : `Estado: **${event.status}**\nFecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\nCupos: **${participants.length}/${event.max_participants}**`
+        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**\n🧩 Roles: ${roleSummary}`
+        : `🟢 Estado: **${event.status}**\n🕒 Fecha: <t:${Math.floor(new Date(event.scheduled_at).getTime() / 1000)}:f>\n👥 Cupos: **${participants.length}/${event.max_participants}**`
     )
     .addFields({
-      name: 'Participantes',
+      name: '👤 Participantes',
       value: participants.length
         ? (withRoles
           ? participants.map((p) => `<@${p.user_id}> (${p.role || 'Otros'})`).join(', ').slice(0, 1024)
@@ -207,14 +214,15 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
 }
 
 export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds) {
+  const participantsList = attendedIds.map((id) => `<@${id}>`).join(', ');
   return new EmbedBuilder()
     .setColor(COLORS.success)
-    .setTitle(`Reparto de loot · Evento #${event.id}`)
-    .setDescription(
-      `Actividad: **${event.activity_type}**\n` +
-      `Loot total: **${Number(lootTotal).toLocaleString('es-ES')}** silver\n` +
-      `Asistentes: **${attendedIds.length}**\n` +
-      `Por persona: **${Number(sharePerPerson).toLocaleString('es-ES')}** silver`
+    .setTitle(`📦 Reparto de loot - Evento #${event.id} - ${event.activity_type}`)
+    .addFields(
+      { name: '💰 Loot total', value: `${Number(lootTotal).toLocaleString('es-ES')} silver`, inline: true },
+      { name: '👥 Participantes', value: `${attendedIds.length}`, inline: true },
+      { name: '➗ Por persona', value: `${Number(sharePerPerson).toLocaleString('es-ES')} silver`, inline: true },
+      { name: 'Participantes que recibieron loot', value: participantsList || '—', inline: false }
     )
     .setTimestamp();
 }
