@@ -72,6 +72,13 @@ function initDatabase() {
       FOREIGN KEY (event_id) REFERENCES events(id)
     );
 
+    CREATE TABLE IF NOT EXISTS event_announcements (
+      event_id INTEGER PRIMARY KEY,
+      channel_id TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      FOREIGN KEY (event_id) REFERENCES events(id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_users_guild ON users(guild_id);
     CREATE INDEX IF NOT EXISTS idx_balance_tx_guild_user ON balance_transactions(guild_id, user_id);
     CREATE INDEX IF NOT EXISTS idx_balance_tx_guild_time ON balance_transactions(guild_id, created_at DESC);

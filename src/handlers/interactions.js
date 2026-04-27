@@ -19,7 +19,8 @@ import {
   getClosableEvents,
   closeEvent,
   updateParticipantRole,
-  isGroupEvent
+  isGroupEvent,
+  setEventAnnouncement
 } from '../database/services.js';
 import {
   myAccountEmbed,
@@ -29,7 +30,8 @@ import {
   successEmbed,
   errorEmbed,
   eventsListEmbed,
-  eventDetailEmbed
+  eventDetailEmbed,
+  lootDistributionEmbed
 } from '../utils/embeds.js';
 import {
   PREFIX,
@@ -40,9 +42,20 @@ import {
   closeEventSelectRows,
   closeAttendeesRows,
   createEventActivitySelect,
-  mainPanelRows
+  mainPanelRows,
+  eventAnnouncementRows
 } from '../utils/components.js';
+import { updateEventAnnouncementMessage } from '../utils/eventAnnouncement.js';
 import { setStaffState, getStaffState, clearStaffState } from '../utils/staffState.js';
+
+function buildEventAnnouncementContent() {
+  // Soporta uno o varios roles separados por coma en la misma variable.
+  const raw = process.env.EVENTS_ANNOUNCE_ROLE_ID || '';
+  const roleIds = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  if (!roleIds.length) return '¡Nuevo evento programado!';
+  const mentions = roleIds.map((id) => `<@&${id}>`).join(' ');
+  return `${mentions} ¡Nuevo evento programado!`;
+}
 
 function useUpdate(interaction) {
   return (interaction.message?.flags?.bitfield & 64) === 64;
@@ -370,6 +383,7 @@ export async function handleInteraction(interaction) {
       }
 
       const participants = getEventParticipants(eventId);
+      updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       await interaction.update({
         embeds: [successEmbed('Rol actualizado', `Quedaste como **${selectedRole}**.`), eventDetailEmbed(event, participants, true)],
         components: eventDetailRows(eventId, true, true),
@@ -438,6 +452,7 @@ export async function handleInteraction(interaction) {
         await interaction.reply({ embeds: [errorEmbed('No se pudo unir', result.reason)], ephemeral: true });
         return;
       }
+      updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
       await interaction.reply({
@@ -454,6 +469,7 @@ export async function handleInteraction(interaction) {
         await interaction.reply({ embeds: [errorEmbed('No estabas inscripto', 'No figurabas como participante.')], ephemeral: true });
         return;
       }
+      updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
       await interaction.reply({
@@ -628,6 +644,25 @@ export async function handleInteraction(interaction) {
         maxParticipants: maxPart,
         affectsAccounting
       });
+      const event = getEvent(eventId);
+      const eventsChannelId = process.env.EVENTS_CHANNEL_ID;
+      if (event && eventsChannelId) {
+        try {
+          const channel = await interaction.client.channels.fetch(eventsChannelId).catch(() => null);
+          if (channel) {
+            const content = buildEventAnnouncementContent();
+            const participants = getEventParticipants(eventId);
+            const msg = await channel.send({
+              content,
+              embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
+              components: eventAnnouncementRows(eventId)
+            });
+            setEventAnnouncement(eventId, channel.id, msg.id);
+          }
+        } catch (err) {
+          console.error('Error publicando evento en canal:', err?.message);
+        }
+      }
       clearStaffState(userId);
       await interaction.reply({
         embeds: [successEmbed('Evento creado', creatorIsStaff
@@ -657,6 +692,23 @@ export async function handleInteraction(interaction) {
       if (!result.ok) {
         await interaction.reply({ embeds: [errorEmbed('No se pudo cerrar', result.reason)], ephemeral: true });
         return;
+      }
+      updateEventAnnouncementMessage(interaction.client, state.eventId).catch(() => {});
+
+      const lootChannelId = process.env.EVENTS_CHANNEL_LOOT_ID;
+      if (result.affectsAccounting && lootChannelId && result.totalLoot > 0 && result.attendedUserIds.length > 0) {
+        try {
+          const channel = await interaction.client.channels.fetch(lootChannelId).catch(() => null);
+          if (channel) {
+            const content = result.attendedUserIds.map((id) => `<@${id}>`).join(' ');
+            await channel.send({
+              content,
+              embeds: [lootDistributionEmbed(result.event, result.totalLoot, result.sharePerUser, result.attendedUserIds)]
+            });
+          }
+        } catch (err) {
+          console.error('Error enviando balance de loot:', err?.message);
+        }
       }
 
       await interaction.reply({

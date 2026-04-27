@@ -4,13 +4,15 @@ Panel con botones: cada miembro ve su saldo y movimientos. Oficiales y administr
 
 Ahora incluye un **sistema de eventos**:
 
-- Crear evento por tipo de actividad (Mazmorra, Avalonian, ZvZ, Hellgate, Recoleccion, Otro)
+- Crear evento por tipo de actividad (Grupal, Mazmorra, Avalonian, ZvZ, Hellgate, Recoleccion, Otro)
 - Inscripcion y baja de participantes desde panel
 - Roles por participante solo para eventos de tipo **Grupal**: **Tanque**, **Healer**, **Flamigero**, **Shadow Caller** y **Otros**
 - Cierre de evento con seleccion de asistentes
 - Reparto automatico del loot entre asistentes en sus cuentas corrientes
 - **Sin comision al gremio**: el total del loot se divide entre los asistentes
 - Si el creador del evento **no es staff**, el evento se crea **sin impacto contable** (se puede crear/cerrar, pero no modifica saldos al cerrar)
+- Publicacion automatica de eventos en canal de anuncios (con ping opcional a rol)
+- Publicacion del balance de reparto de loot en canal dedicado al cerrar el evento
 
 ## Requisitos
 
@@ -69,6 +71,9 @@ SQLite en `data/guild.db` por defecto, o en `DATA_DIR` si está definido. En hos
 | `PANEL_CHANNEL_ID` | Canal donde se publica el panel |
 | `ADMIN_USER_IDS` | IDs de usuario admin (coma) |
 | `LEADER_ROLE_IDS` | IDs de roles de oficial (coma) |
+| `EVENTS_CHANNEL_ID` | Canal donde se publican eventos nuevos (opcional) |
+| `EVENTS_ANNOUNCE_ROLE_ID` | Uno o varios roles a mencionar, separados por coma (opcional) |
+| `EVENTS_CHANNEL_LOOT_ID` | Canal donde se publica el balance de loot (opcional) |
 | `DATA_DIR` | Carpeta del archivo `.db` |
 | `PORT` | Si se define, abre HTTP `GET /` → `ok` (health check) |
 

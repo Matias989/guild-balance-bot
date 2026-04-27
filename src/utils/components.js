@@ -118,6 +118,15 @@ export function eventDetailRows(eventId, isParticipant, withRoleSelector = false
   return rows;
 }
 
+export function eventAnnouncementRows(eventId) {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`${PREFIX}join_event:${eventId}`).setLabel('Unirme').setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId(`${PREFIX}leave_event:${eventId}`).setLabel('Salir').setStyle(ButtonStyle.Secondary)
+    )
+  ];
+}
+
 export function eventRoleSelectRow(eventId) {
   const select = new StringSelectMenuBuilder()
     .setCustomId(`${PREFIX}event_role:${eventId}`)

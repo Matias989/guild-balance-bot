@@ -274,3 +274,13 @@ export function closeEvent(eventId, attendedUserIds, totalLoot, closedByUserId =
     affectsAccounting: event.affects_accounting !== 0
   };
 }
+
+export function setEventAnnouncement(eventId, channelId, messageId) {
+  db.prepare(`
+    INSERT OR REPLACE INTO event_announcements (event_id, channel_id, message_id) VALUES (?, ?, ?)
+  `).run(eventId, channelId, messageId);
+}
+
+export function getEventAnnouncement(eventId) {
+  return db.prepare('SELECT * FROM event_announcements WHERE event_id = ?').get(eventId);
+}

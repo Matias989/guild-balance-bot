@@ -205,3 +205,16 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
     })
     .setTimestamp();
 }
+
+export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds) {
+  return new EmbedBuilder()
+    .setColor(COLORS.success)
+    .setTitle(`Reparto de loot · Evento #${event.id}`)
+    .setDescription(
+      `Actividad: **${event.activity_type}**\n` +
+      `Loot total: **${Number(lootTotal).toLocaleString('es-ES')}** silver\n` +
+      `Asistentes: **${attendedIds.length}**\n` +
+      `Por persona: **${Number(sharePerPerson).toLocaleString('es-ES')}** silver`
+    )
+    .setTimestamp();
+}
