@@ -31,7 +31,13 @@ export async function updateEventAnnouncementMessage(client, eventId) {
     }
 
     const participants = getEventParticipants(eventId);
-    const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+    const guild = await client.guilds.fetch(event.guild_id).catch(() => null);
+    const detail = await buildEventDetailPayload(
+      event,
+      participants,
+      eventHasRoleSelection(event),
+      guild
+    );
     await msg.edit({
       ...detail,
       components: eventAnnouncementRows(eventId, event, participants)

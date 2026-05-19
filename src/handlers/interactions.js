@@ -345,7 +345,7 @@ export async function handleInteraction(interaction) {
       }
       const participants = getEventParticipants(eventId);
       const isParticipant = participants.some((p) => p.user_id === userId);
-      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       await interaction.update({
         ...detail,
         components: eventDetailRows(
@@ -430,7 +430,7 @@ export async function handleInteraction(interaction) {
       const ann = getEventAnnouncement(eventId);
       const fromAnnouncement = ann && interaction.message?.id === ann.message_id;
       const roleLabel = isAvalonianaEvent(event) ? 'Posición' : 'Rol';
-      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       const embeds = fromAnnouncement
         ? detail.embeds
         : [successEmbed(`${roleLabel} actualizado`, `Quedaste en **${selectedRole}**.`), ...detail.embeds];
@@ -508,7 +508,7 @@ export async function handleInteraction(interaction) {
 
       const participants = getEventParticipants(eventId);
       const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
-      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       await interaction.update({
         embeds: [
           successEmbed('Participantes quitados', `Se quitaron **${removed}** participante(s) del evento #${eventId}.`),
@@ -634,7 +634,7 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
-      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       await interaction.reply({
         embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), ...detail.embeds],
         files: detail.files,
@@ -662,7 +662,7 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
-      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       await interaction.reply({
         embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), ...detail.embeds],
         files: detail.files,
@@ -853,7 +853,7 @@ export async function handleInteraction(interaction) {
           if (channel) {
             const content = buildEventAnnouncementContent();
             const participants = getEventParticipants(eventId);
-            const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+            const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
             const msg = await channel.send({
               content,
               ...detail,

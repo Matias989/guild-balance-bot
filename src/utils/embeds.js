@@ -1,9 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
-import { formatAvalonianaRoleBoard, buildAvalonianaRosterDescription } from './avalonianaRoles.js';
-import {
-  createAvalonianaBoardAttachment,
-  getAvalonianaBoardAttachmentName
-} from './avalonianaBoard.js';
+import { buildAvalonianaRosterDescription } from './avalonianaRoles.js';
+import { getAvalonianaEmojiMap } from './avalonianaEmojis.js';
 
 const COLORS = {
   primary: 0x2d7d46,
@@ -225,33 +222,21 @@ export function eventDetailEmbed(event, participants, roleMode = false) {
   return embed;
 }
 
-/** Embed(s) + adjunto del tablero con iconos PNG para eventos Avaloniana */
-export async function buildEventDetailPayload(event, participants, roleMode = false) {
+/** Embed del evento; Avaloniana usa iconos del servidor inline en el listado de posiciones */
+export async function buildEventDetailPayload(event, participants, roleMode = false, guild = null) {
   const mainEmbed = eventDetailEmbed(event, participants, roleMode);
-  const files = [];
 
   if (event?.activity_type === 'Avaloniana') {
-    const isActive = event?.status === 'active';
-    const rosterEmbed = new EmbedBuilder()
-      .setColor(isActive ? COLORS.primary : COLORS.info)
-      .setDescription(buildAvalonianaRosterDescription(participants));
-
-    const board = await createAvalonianaBoardAttachment(participants);
-    if (board) {
-      files.push(board);
-      mainEmbed.setImage(`attachment://${getAvalonianaBoardAttachmentName()}`);
-      return { embeds: [mainEmbed, rosterEmbed], files };
-    }
-
+    const emojiMap = await getAvalonianaEmojiMap(guild);
+    const roster = buildAvalonianaRosterDescription(participants, emojiMap);
     mainEmbed.addFields({
       name: '📋 Posiciones',
-      value: formatAvalonianaRoleBoard(participants).slice(0, 1024),
+      value: roster || '—',
       inline: false
     });
-    return { embeds: [mainEmbed, rosterEmbed], files };
   }
 
-  return { embeds: [mainEmbed], files };
+  return { embeds: [mainEmbed], files: [] };
 }
 
 export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds, affectsAccounting = true) {
