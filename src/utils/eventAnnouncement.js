@@ -1,6 +1,11 @@
 import { EmbedBuilder } from 'discord.js';
-import { getEventAnnouncement, getEvent, getEventParticipants, isGroupEvent } from '../database/services.js';
-import { eventDetailEmbed } from './embeds.js';
+import {
+  getEventAnnouncement,
+  getEvent,
+  getEventParticipants,
+  eventHasRoleSelection
+} from '../database/services.js';
+import { buildEventDetailPayload } from './embeds.js';
 import { eventAnnouncementRows } from './components.js';
 
 export async function updateEventAnnouncementMessage(client, eventId) {
@@ -21,14 +26,15 @@ export async function updateEventAnnouncementMessage(client, eventId) {
         .setTitle(`Evento #${event.id} · Cerrado`)
         .setDescription(`${event.name || event.activity_type}\nEste evento ya no acepta inscripciones.`)
         .setTimestamp();
-      await msg.edit({ embeds: [closedEmbed], components: [] });
+      await msg.edit({ embeds: [closedEmbed], components: [], files: [] });
       return;
     }
 
     const participants = getEventParticipants(eventId);
+    const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
     await msg.edit({
-      embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
-      components: eventAnnouncementRows(eventId)
+      ...detail,
+      components: eventAnnouncementRows(eventId, event, participants)
     });
   } catch (err) {
     console.error('Error actualizando anuncio de evento:', err?.message);

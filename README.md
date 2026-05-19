@@ -4,9 +4,10 @@ Panel con botones: cada miembro ve su saldo y movimientos. Oficiales y administr
 
 Ahora incluye un **sistema de eventos**:
 
-- Crear evento por tipo de actividad (Grupal, Mazmorra, Avalonian, ZvZ, Hellgate, Recoleccion, Otro)
+- Crear evento por tipo de actividad (Grupal, Mazmorra, Avaloniana, ZvZ, Hellgate, Recoleccion, Otro)
 - Inscripcion y baja de participantes desde panel
 - Roles por participante solo para eventos de tipo **Grupal**: **Tanque**, **Healer**, **Flamigero**, **Shadow Caller** y **Otros**
+- Eventos **Avaloniana** con plantilla de posiciones: **Martillo** (0/1), **Incubo** (0/1), **Raiz Ferrea** (0/1), **SC** (0/1), **Falce** (0/5); tablero visual con iconos PNG (`src/img/`) y menú para elegir posiciones libres
 - Cierre de evento con seleccion de asistentes
 - Reparto automatico del loot entre asistentes en sus cuentas corrientes
 - **Sin comision al gremio**: el total del loot se divide entre los asistentes

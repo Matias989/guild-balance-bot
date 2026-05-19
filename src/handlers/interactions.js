@@ -20,8 +20,13 @@ import {
   closeEvent,
   updateParticipantRole,
   isGroupEvent,
-  setEventAnnouncement
+  isAvalonianaEvent,
+  eventHasRoleSelection,
+  getDefaultMaxParticipants,
+  setEventAnnouncement,
+  getEventAnnouncement
 } from '../database/services.js';
+import { canTakeAvalonianaRole, AVALONIANA_ROLE_NAMES } from '../utils/avalonianaRoles.js';
 import {
   myAccountEmbed,
   guildSummaryEmbed,
@@ -30,7 +35,7 @@ import {
   successEmbed,
   errorEmbed,
   eventsListEmbed,
-  eventDetailEmbed,
+  buildEventDetailPayload,
   lootDistributionEmbed
 } from '../utils/embeds.js';
 import {
@@ -340,9 +345,18 @@ export async function handleInteraction(interaction) {
       }
       const participants = getEventParticipants(eventId);
       const isParticipant = participants.some((p) => p.user_id === userId);
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
       await interaction.update({
-        embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
-        components: eventDetailRows(eventId, isParticipant, isGroupEvent(event), isStaff(interaction, guildId)),
+        ...detail,
+        components: eventDetailRows(
+          eventId,
+          isParticipant,
+          eventHasRoleSelection(event),
+          isStaff(interaction, guildId),
+          event,
+          participants,
+          userId
+        ),
         ephemeral: true
       });
       return;
@@ -360,17 +374,32 @@ export async function handleInteraction(interaction) {
         });
         return;
       }
-      if (!isGroupEvent(event)) {
+      if (!eventHasRoleSelection(event)) {
         await interaction.reply({
-          embeds: [errorEmbed('No aplica', 'La seleccion de roles solo esta disponible para eventos de tipo Grupal.')],
+          embeds: [errorEmbed('No aplica', 'La selección de roles solo está disponible para eventos Grupal o Avaloniana.')],
           ephemeral: true
         });
         return;
       }
 
       const participantsBefore = getEventParticipants(eventId);
-      // En grupales, cada rol clave debe ser único (excepto "Otros").
-      if (selectedRole !== 'Otros') {
+
+      if (isAvalonianaEvent(event)) {
+        if (!AVALONIANA_ROLE_NAMES.includes(selectedRole)) {
+          await interaction.reply({
+            embeds: [errorEmbed('Rol inválido', 'Elegí una posición de la plantilla Avaloniana.')],
+            ephemeral: true
+          });
+          return;
+        }
+        if (!canTakeAvalonianaRole(participantsBefore, selectedRole, userId)) {
+          await interaction.reply({
+            embeds: [errorEmbed('Posición ocupada', `**${selectedRole}** ya está completa. Elegí otra posición disponible.`)],
+            ephemeral: true
+          });
+          return;
+        }
+      } else if (selectedRole !== 'Otros') {
         const takenByAnother = participantsBefore.some(
           (p) => p.role === selectedRole && p.user_id !== userId
         );
@@ -398,10 +427,29 @@ export async function handleInteraction(interaction) {
 
       const participants = getEventParticipants(eventId);
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
+      const ann = getEventAnnouncement(eventId);
+      const fromAnnouncement = ann && interaction.message?.id === ann.message_id;
+      const roleLabel = isAvalonianaEvent(event) ? 'Posición' : 'Rol';
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
+      const embeds = fromAnnouncement
+        ? detail.embeds
+        : [successEmbed(`${roleLabel} actualizado`, `Quedaste en **${selectedRole}**.`), ...detail.embeds];
+      const components = fromAnnouncement
+        ? eventAnnouncementRows(eventId, event, participants, userId)
+        : eventDetailRows(
+          eventId,
+          true,
+          eventHasRoleSelection(event),
+          isStaff(interaction, guildId),
+          event,
+          participants,
+          userId
+        );
       await interaction.update({
-        embeds: [successEmbed('Rol actualizado', `Quedaste como **${selectedRole}**.`), eventDetailEmbed(event, participants, true)],
-        components: eventDetailRows(eventId, true, true, isStaff(interaction, guildId)),
-        ephemeral: true
+        embeds,
+        files: detail.files,
+        components,
+        ephemeral: !fromAnnouncement
       });
       return;
     }
@@ -460,11 +508,13 @@ export async function handleInteraction(interaction) {
 
       const participants = getEventParticipants(eventId);
       const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
       await interaction.update({
         embeds: [
           successEmbed('Participantes quitados', `Se quitaron **${removed}** participante(s) del evento #${eventId}.`),
-          eventDetailEmbed(event, participants, isGroupEvent(event))
+          ...detail.embeds
         ],
+        files: detail.files,
         components: removeParticipantsRows(eventId, participantsWithNames),
         ephemeral: true
       });
@@ -563,6 +613,19 @@ export async function handleInteraction(interaction) {
 
     if (interaction.isButton() && customId.startsWith(`${PREFIX}join_event:`)) {
       const eventId = parseInt(customId.split(':')[1], 10);
+      const eventForJoin = getEvent(eventId);
+      if (isAvalonianaEvent(eventForJoin)) {
+        await interaction.reply({
+          embeds: [
+            errorEmbed(
+              'Elegí tu posición',
+              'En eventos **Avaloniana** debés elegir una posición disponible en el menú de abajo.'
+            )
+          ],
+          ephemeral: true
+        });
+        return;
+      }
       const result = joinEvent(eventId, userId, guildId);
       if (!result.ok) {
         await interaction.reply({ embeds: [errorEmbed('No se pudo unir', result.reason)], ephemeral: true });
@@ -571,9 +634,19 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
       await interaction.reply({
-        embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
-        components: eventDetailRows(eventId, true, isGroupEvent(event), isStaff(interaction, guildId)),
+        embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), ...detail.embeds],
+        files: detail.files,
+        components: eventDetailRows(
+          eventId,
+          true,
+          eventHasRoleSelection(event),
+          isStaff(interaction, guildId),
+          event,
+          participants,
+          userId
+        ),
         ephemeral: true
       });
       return;
@@ -589,9 +662,19 @@ export async function handleInteraction(interaction) {
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
+      const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
       await interaction.reply({
-        embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), eventDetailEmbed(event, participants, isGroupEvent(event))],
-        components: eventDetailRows(eventId, false, isGroupEvent(event), isStaff(interaction, guildId)),
+        embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), ...detail.embeds],
+        files: detail.files,
+        components: eventDetailRows(
+          eventId,
+          false,
+          eventHasRoleSelection(event),
+          isStaff(interaction, guildId),
+          event,
+          participants,
+          userId
+        ),
         ephemeral: true
       });
       return;
@@ -770,10 +853,11 @@ export async function handleInteraction(interaction) {
           if (channel) {
             const content = buildEventAnnouncementContent();
             const participants = getEventParticipants(eventId);
+            const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event));
             const msg = await channel.send({
               content,
-              embeds: [eventDetailEmbed(event, participants, isGroupEvent(event))],
-              components: eventAnnouncementRows(eventId)
+              ...detail,
+              components: eventAnnouncementRows(eventId, event, participants)
             });
             setEventAnnouncement(eventId, channel.id, msg.id);
           }
@@ -919,6 +1003,7 @@ function buildRemoveModal(targetUserId, guildId) {
 }
 
 function buildCreateEventModal(activityType, canChooseAccounting = false) {
+  const defaultMax = String(getDefaultMaxParticipants(activityType));
   const rows = [
     new ActionRowBuilder().addComponents(
       new TextInputBuilder()
@@ -941,7 +1026,7 @@ function buildCreateEventModal(activityType, canChooseAccounting = false) {
         .setCustomId('event_max')
         .setLabel('Cupo maximo')
         .setStyle(TextInputStyle.Short)
-        .setValue('8')
+        .setValue(defaultMax)
         .setRequired(true)
     )
   ];

@@ -1,4 +1,9 @@
 import { EmbedBuilder } from 'discord.js';
+import { AVALONIANA_ROLES, formatAvalonianaRoleBoard } from './avalonianaRoles.js';
+import {
+  createAvalonianaBoardAttachment,
+  getAvalonianaBoardAttachmentName
+} from './avalonianaBoard.js';
 
 const COLORS = {
   primary: 0x2d7d46,
@@ -183,8 +188,28 @@ export function eventsListEmbed(events) {
   return embed;
 }
 
-export function eventDetailEmbed(event, participants, withRoles = false) {
+function buildAvalonianaParticipantLines(participants) {
+  if (!participants.length) return 'Sin participantes';
+  const byRole = new Map(AVALONIANA_ROLES.map((r) => [r.name, []]));
+  for (const p of participants) {
+    if (byRole.has(p.role)) byRole.get(p.role).push(p);
+    else if (!byRole.has('Otros')) byRole.set('Otros', [p]);
+  }
+  const lines = [];
+  for (const { name } of AVALONIANA_ROLES) {
+    const list = byRole.get(name) || [];
+    if (list.length) {
+      lines.push(`**${name}**: ${list.map((p) => `<@${p.user_id}>`).join(', ')}`);
+    }
+  }
+  return lines.length ? lines.join('\n').slice(0, 1024) : 'Sin participantes';
+}
+
+export function eventDetailEmbed(event, participants, roleMode = false) {
   const isActive = event?.status === 'active';
+  const isAvaloniana = event?.activity_type === 'Avaloniana';
+  const isGrupal = event?.activity_type === 'Grupal';
+  const withRoles = roleMode && isGrupal;
   const roleIcon = {
     Tanque: '🛡️',
     Healer: '💚',
@@ -193,24 +218,55 @@ export function eventDetailEmbed(event, participants, withRoles = false) {
     Otros: '👥'
   };
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setColor(isActive ? COLORS.primary : COLORS.info)
     .setTitle(`🎯 ${event.name || event.activity_type} · #${event.id}`)
     .setDescription(
-      withRoles
-        ? `🟢 Estado: **${event.status}**\n🕒 Fecha: ${formatDateTimeUTC(event.scheduled_at)}\n👥 Cupos: **${participants.length}/${event.max_participants}**`
-        : `🟢 Estado: **${event.status}**\n🕒 Fecha: ${formatDateTimeUTC(event.scheduled_at)}\n👥 Cupos: **${participants.length}/${event.max_participants}**`
+      `🟢 Estado: **${event.status}**\n🕒 Fecha: ${formatDateTimeUTC(event.scheduled_at)}\n👥 Cupos: **${participants.length}/${event.max_participants}**`
     )
-    .addFields({
-      name: '👤 Participantes',
-      value: participants.length
-        ? (withRoles
-          ? participants.map((p) => `${roleIcon[p.role] || roleIcon.Otros} <@${p.user_id}>`).join('\n').slice(0, 1024)
-          : participants.map((p) => `<@${p.user_id}>`).join(', ').slice(0, 1024))
-        : 'Sin participantes',
-      inline: false
-    })
     .setTimestamp();
+
+  if (isAvaloniana) {
+    embed.addFields({
+      name: '👤 Participantes',
+      value: buildAvalonianaParticipantLines(participants),
+      inline: false
+    });
+    return embed;
+  }
+
+  embed.addFields({
+    name: '👤 Participantes',
+    value: participants.length
+      ? (withRoles
+        ? participants.map((p) => `${roleIcon[p.role] || roleIcon.Otros} <@${p.user_id}>`).join('\n').slice(0, 1024)
+        : participants.map((p) => `<@${p.user_id}>`).join(', ').slice(0, 1024))
+      : 'Sin participantes',
+    inline: false
+  });
+  return embed;
+}
+
+/** Embed + adjunto del tablero con iconos PNG para eventos Avaloniana */
+export async function buildEventDetailPayload(event, participants, roleMode = false) {
+  const embed = eventDetailEmbed(event, participants, roleMode);
+  const files = [];
+
+  if (event?.activity_type === 'Avaloniana') {
+    const board = await createAvalonianaBoardAttachment(participants);
+    if (board) {
+      files.push(board);
+      embed.setImage(`attachment://${getAvalonianaBoardAttachmentName()}`);
+    } else {
+      embed.addFields({
+        name: '📋 Posiciones',
+        value: formatAvalonianaRoleBoard(participants).slice(0, 1024),
+        inline: false
+      });
+    }
+  }
+
+  return { embeds: [embed], files };
 }
 
 export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds, affectsAccounting = true) {

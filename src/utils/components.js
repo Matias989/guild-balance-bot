@@ -5,6 +5,7 @@ import {
   StringSelectMenuBuilder,
   UserSelectMenuBuilder
 } from 'discord.js';
+import { getAvailableAvalonianaRoleOptions } from './avalonianaRoles.js';
 
 export const PREFIX = 'bal_';
 
@@ -110,9 +111,22 @@ export function eventsListRows(events) {
   ];
 }
 
-export function eventDetailRows(eventId, isParticipant, withRoleSelector = false, canManageParticipants = false) {
+export function eventDetailRows(
+  eventId,
+  isParticipant,
+  withRoleSelector = false,
+  canManageParticipants = false,
+  event = null,
+  participants = [],
+  userId = null
+) {
   const rows = [];
-  if (withRoleSelector) rows.push(eventRoleSelectRow(eventId));
+  if (withRoleSelector && event?.activity_type === 'Avaloniana') {
+    const roleRow = eventAvalonianaRoleSelectRow(eventId, participants, userId);
+    if (roleRow) rows.push(roleRow);
+  } else if (withRoleSelector) {
+    rows.push(eventRoleSelectRow(eventId));
+  }
   const buttons = [
     isParticipant
       ? new ButtonBuilder().setCustomId(`${PREFIX}leave_event:${eventId}`).setLabel('Salir').setStyle(ButtonStyle.Danger)
@@ -131,13 +145,29 @@ export function eventDetailRows(eventId, isParticipant, withRoleSelector = false
   return rows;
 }
 
-export function eventAnnouncementRows(eventId) {
-  return [
+export function eventAnnouncementRows(eventId, event = null, participants = [], userId = null) {
+  const rows = [];
+  if (event?.activity_type === 'Avaloniana') {
+    const roleRow = eventAvalonianaRoleSelectRow(eventId, participants, userId);
+    if (roleRow) rows.push(roleRow);
+  }
+  rows.push(
     new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(`${PREFIX}join_event:${eventId}`).setLabel('Unirme').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(`${PREFIX}leave_event:${eventId}`).setLabel('Salir').setStyle(ButtonStyle.Secondary)
     )
-  ];
+  );
+  return rows;
+}
+
+export function eventAvalonianaRoleSelectRow(eventId, participants, userId) {
+  const options = getAvailableAvalonianaRoleOptions(participants, userId);
+  if (!options.length) return null;
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`${PREFIX}event_role:${eventId}`)
+    .setPlaceholder('Elegir posición disponible...')
+    .addOptions(options.slice(0, 25));
+  return new ActionRowBuilder().addComponents(select);
 }
 
 export function eventRoleSelectRow(eventId) {

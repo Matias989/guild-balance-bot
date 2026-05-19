@@ -1,4 +1,9 @@
 import db from './index.js';
+import {
+  AVALONIANA_ROLE_NAMES,
+  AVALONIANA_MAX_PARTICIPANTS,
+  canTakeAvalonianaRole
+} from '../utils/avalonianaRoles.js';
 
 const ALLOWED_CONFIG_KEYS = new Set([
   'panel_channel_id',
@@ -135,7 +140,7 @@ export function getBalanceHistory(guildId, userId, limit = 15) {
   `).all(guildId, userId, limit);
 }
 
-const ACTIVITY_TYPES = ['Grupal', 'Mazmorra', 'Avalonian', 'ZvZ', 'Hellgate', 'Recoleccion', 'Otro'];
+const ACTIVITY_TYPES = ['Grupal', 'Mazmorra', 'Avaloniana', 'ZvZ', 'Hellgate', 'Recoleccion', 'Otro'];
 const EVENT_ROLES = ['Tanque', 'Healer', 'Flamigero', 'Shadow Caller', 'Otros'];
 
 export function getActivityTypes() {
@@ -148,6 +153,14 @@ export function getEventRoles() {
 
 export function isGroupEvent(event) {
   return event?.activity_type === 'Grupal';
+}
+
+export function isAvalonianaEvent(event) {
+  return event?.activity_type === 'Avaloniana';
+}
+
+export function eventHasRoleSelection(event) {
+  return isGroupEvent(event) || isAvalonianaEvent(event);
 }
 
 export function createEvent(guildId, creatorId, data) {
@@ -201,17 +214,42 @@ export function joinEvent(eventId, userId, guildId, role = 'Otros') {
   if (exists) return { ok: false, reason: 'Ya estas inscripto.' };
   const count = db.prepare('SELECT COUNT(*) AS c FROM event_participants WHERE event_id = ?').get(eventId).c;
   if (count >= event.max_participants) return { ok: false, reason: 'Cupos llenos.' };
-  const normalizedRole = isGroupEvent(event) && EVENT_ROLES.includes(role) ? role : 'Otros';
+  const participants = getEventParticipants(eventId);
+  const normalizedRole = normalizeEventRole(event, role, participants, userId);
+  if (isAvalonianaEvent(event) && !AVALONIANA_ROLE_NAMES.includes(normalizedRole)) {
+    return { ok: false, reason: 'Elegí un rol disponible del menú de posiciones.' };
+  }
+  if (isAvalonianaEvent(event) && !canTakeAvalonianaRole(participants, normalizedRole, userId)) {
+    return { ok: false, reason: `La posición **${normalizedRole}** ya está completa.` };
+  }
   db.prepare('INSERT INTO event_participants (event_id, user_id, role) VALUES (?, ?, ?)').run(eventId, userId, normalizedRole);
   return { ok: true };
 }
 
 export function updateParticipantRole(eventId, userId, role, event = null) {
   const ev = event || getEvent(eventId);
-  const normalizedRole = isGroupEvent(ev) && EVENT_ROLES.includes(role) ? role : 'Otros';
+  const participants = getEventParticipants(eventId);
+  const normalizedRole = normalizeEventRole(ev, role, participants, userId);
+  if (isAvalonianaEvent(ev) && !canTakeAvalonianaRole(participants, normalizedRole, userId)) {
+    return false;
+  }
   const result = db.prepare('UPDATE event_participants SET role = ? WHERE event_id = ? AND user_id = ?')
     .run(normalizedRole, eventId, userId);
   return result.changes > 0;
+}
+
+function normalizeEventRole(event, role, participants, userId) {
+  if (isGroupEvent(event) && EVENT_ROLES.includes(role)) return role;
+  if (isAvalonianaEvent(event) && AVALONIANA_ROLE_NAMES.includes(role)) return role;
+  if (isAvalonianaEvent(event)) {
+    const current = participants.find((p) => p.user_id === userId);
+    if (current && AVALONIANA_ROLE_NAMES.includes(current.role)) return current.role;
+  }
+  return 'Otros';
+}
+
+export function getDefaultMaxParticipants(activityType) {
+  return activityType === 'Avaloniana' ? AVALONIANA_MAX_PARTICIPANTS : 8;
 }
 
 export function leaveEvent(eventId, userId) {
