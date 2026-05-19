@@ -3,6 +3,7 @@ import { Client, Events, GatewayIntentBits, Partials } from 'discord.js';
 import { config } from 'dotenv';
 import { setupPanel } from './handlers/panel.js';
 import { handleInteraction } from './handlers/interactions.js';
+import { getAvalonianaEmojiMap } from './utils/avalonianaEmojis.js';
 
 config();
 
@@ -22,6 +23,16 @@ const client = new Client({
 client.once(Events.ClientReady, async (c) => {
   console.log(`Bot listo como ${c.user.tag}`);
   await setupPanel(c);
+
+  const guildId = process.env.GUILD_ID;
+  if (guildId) {
+    const guild = await c.guilds.fetch(guildId).catch(() => null);
+    if (guild) {
+      getAvalonianaEmojiMap(guild).catch((err) => {
+        console.warn('Precarga emojis Avaloniana:', err?.message);
+      });
+    }
+  }
 });
 
 client.on(Events.InteractionCreate, (interaction) => handleInteraction(interaction));

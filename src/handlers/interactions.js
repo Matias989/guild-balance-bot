@@ -1,4 +1,5 @@
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } from 'discord.js';
+import { EPHEMERAL } from '../utils/discordFlags.js';
 import {
   registerUser,
   getGuildConfig,
@@ -98,7 +99,7 @@ export async function handleInteraction(interaction) {
   if (!guildId) {
     await interaction.reply({
       content: 'Solo funciona en un servidor.',
-      ephemeral: true
+      flags: EPHEMERAL
     }).catch(() => {});
     return;
   }
@@ -111,7 +112,7 @@ export async function handleInteraction(interaction) {
       const history = getBalanceHistory(guildId, userId, 12);
       const payload = {
         embeds: [myAccountEmbed(userId, balance, history)],
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -123,7 +124,7 @@ export async function handleInteraction(interaction) {
       const aggregate = getGuildBalanceAggregate(guildId);
       const payload = {
         embeds: [guildSummaryEmbed(accounts, aggregate)],
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -139,7 +140,7 @@ export async function handleInteraction(interaction) {
               '**Más opciones** solo está disponible para oficiales y administradores.'
             )
           ],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -151,7 +152,7 @@ export async function handleInteraction(interaction) {
           )
         ],
         components: staffMoreRows(),
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -163,7 +164,7 @@ export async function handleInteraction(interaction) {
       const payload = {
         embeds: [eventsListEmbed(events)],
         components: eventsListRows(events),
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -178,7 +179,7 @@ export async function handleInteraction(interaction) {
           new ActionRowBuilder().addComponents(select),
           ...eventsListRows(getActiveEvents(guildId)).slice(1, 2)
         ],
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -194,7 +195,7 @@ export async function handleInteraction(interaction) {
           embeds: [errorEmbed('Sin eventos', isUserStaff
             ? 'No hay eventos activos para cerrar.'
             : 'No tienes eventos activos creados por ti para cerrar.')],
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -203,7 +204,7 @@ export async function handleInteraction(interaction) {
       const payload = {
         embeds: [staffPromptEmbed('Cerrar evento', 'Selecciona un evento y luego quienes asistieron.')],
         components: closeEventSelectRows(events),
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -214,7 +215,7 @@ export async function handleInteraction(interaction) {
       const payload = {
         embeds: [staffPromptEmbed('Panel principal', 'Elegi una opcion del panel.')],
         components: mainPanelRows(),
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -226,7 +227,7 @@ export async function handleInteraction(interaction) {
       const payload = {
         embeds: [staffPromptEmbed('Cancelado', 'Podés usar de nuevo el panel del canal.')],
         components: [],
-        ephemeral: true
+        flags: EPHEMERAL
       };
       if (useUpdate(interaction)) await interaction.update(payload);
       else await interaction.reply(payload);
@@ -250,7 +251,7 @@ export async function handleInteraction(interaction) {
               'Solo oficiales o administradores pueden usar esta acción. Abrí **Más opciones** desde el panel.'
             )
           ],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -264,7 +265,7 @@ export async function handleInteraction(interaction) {
             )
           ],
           components: staffUserSelectRow('add'),
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -280,7 +281,7 @@ export async function handleInteraction(interaction) {
             )
           ],
           components: staffUserSelectRow('remove'),
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -292,7 +293,7 @@ export async function handleInteraction(interaction) {
         const payload = {
           embeds: [guildMovementsEmbed(rows)],
           components: [],
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -307,7 +308,7 @@ export async function handleInteraction(interaction) {
             new ActionRowBuilder().addComponents(select),
             ...staffMoreRows().slice(1, 2)
           ],
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -319,7 +320,7 @@ export async function handleInteraction(interaction) {
         if (!events.length) {
           const payload = {
             embeds: [errorEmbed('Sin eventos', 'No hay eventos activos para cerrar.')],
-            ephemeral: true
+            flags: EPHEMERAL
           };
           if (useUpdate(interaction)) await interaction.update(payload);
           else await interaction.reply(payload);
@@ -328,7 +329,7 @@ export async function handleInteraction(interaction) {
         const payload = {
           embeds: [staffPromptEmbed('Cerrar evento', 'Selecciona un evento y luego quienes asistieron.')],
           components: closeEventSelectRows(events),
-          ephemeral: true
+          flags: EPHEMERAL
         };
         if (useUpdate(interaction)) await interaction.update(payload);
         else await interaction.reply(payload);
@@ -340,13 +341,14 @@ export async function handleInteraction(interaction) {
       const eventId = parseInt(interaction.values[0], 10);
       const event = getEvent(eventId);
       if (!event) {
-        await interaction.update({ embeds: [errorEmbed('Error', 'Evento no encontrado.')], components: [], ephemeral: true });
+        await interaction.update({ embeds: [errorEmbed('Error', 'Evento no encontrado.')], components: [], flags: EPHEMERAL });
         return;
       }
       const participants = getEventParticipants(eventId);
       const isParticipant = participants.some((p) => p.user_id === userId);
+      await interaction.deferUpdate();
       const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
-      await interaction.update({
+      await interaction.editReply({
         ...detail,
         components: eventDetailRows(
           eventId,
@@ -356,8 +358,7 @@ export async function handleInteraction(interaction) {
           event,
           participants,
           userId
-        ),
-        ephemeral: true
+        )
       });
       return;
     }
@@ -370,14 +371,14 @@ export async function handleInteraction(interaction) {
         await interaction.update({
           embeds: [errorEmbed('Evento no disponible', 'El evento no existe o ya se cerro.')],
           components: [],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
       if (!eventHasRoleSelection(event)) {
         await interaction.reply({
           embeds: [errorEmbed('No aplica', 'La selección de roles solo está disponible para eventos Grupal o Avaloniana.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -388,14 +389,14 @@ export async function handleInteraction(interaction) {
         if (!AVALONIANA_ROLE_NAMES.includes(selectedRole)) {
           await interaction.reply({
             embeds: [errorEmbed('Rol inválido', 'Elegí una posición de la plantilla Avaloniana.')],
-            ephemeral: true
+            flags: EPHEMERAL
           });
           return;
         }
         if (!canTakeAvalonianaRole(participantsBefore, selectedRole, userId)) {
           await interaction.reply({
             embeds: [errorEmbed('Posición ocupada', `**${selectedRole}** ya está completa. Elegí otra posición disponible.`)],
-            ephemeral: true
+            flags: EPHEMERAL
           });
           return;
         }
@@ -406,7 +407,7 @@ export async function handleInteraction(interaction) {
         if (takenByAnother) {
           await interaction.reply({
             embeds: [errorEmbed('Rol ocupado', `El rol **${selectedRole}** ya está asignado. Elige otro rol u **Otros**.`)],
-            ephemeral: true
+            flags: EPHEMERAL
           });
           return;
         }
@@ -419,7 +420,7 @@ export async function handleInteraction(interaction) {
         if (!joinResult.ok) {
           await interaction.reply({
             embeds: [errorEmbed('No se pudo unir', joinResult.reason)],
-            ephemeral: true
+            flags: EPHEMERAL
           });
           return;
         }
@@ -430,6 +431,8 @@ export async function handleInteraction(interaction) {
       const ann = getEventAnnouncement(eventId);
       const fromAnnouncement = ann && interaction.message?.id === ann.message_id;
       const roleLabel = isAvalonianaEvent(event) ? 'Posición' : 'Rol';
+
+      await interaction.deferUpdate();
       const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
       const embeds = fromAnnouncement
         ? detail.embeds
@@ -445,12 +448,12 @@ export async function handleInteraction(interaction) {
           participants,
           userId
         );
-      await interaction.update({
-        embeds,
-        files: detail.files,
-        components,
-        ephemeral: !fromAnnouncement
-      });
+
+      if (fromAnnouncement) {
+        await interaction.message.edit({ embeds, files: detail.files, components });
+      } else {
+        await interaction.editReply({ embeds, files: detail.files, components });
+      }
       return;
     }
 
@@ -459,7 +462,7 @@ export async function handleInteraction(interaction) {
       if (!isStaff(interaction, guildId)) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Solo staff puede quitar participantes de un evento.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -467,7 +470,7 @@ export async function handleInteraction(interaction) {
       if (!event || event.status !== 'active') {
         await interaction.reply({
           embeds: [errorEmbed('No disponible', 'Evento no encontrado o ya cerrado.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -476,7 +479,7 @@ export async function handleInteraction(interaction) {
       await interaction.reply({
         embeds: [staffPromptEmbed('Quitar participantes', `Evento #${eventId}. Selecciona a quiénes quieres quitar.`)],
         components: removeParticipantsRows(eventId, participantsWithNames),
-        ephemeral: true
+        flags: EPHEMERAL
       });
       return;
     }
@@ -486,7 +489,7 @@ export async function handleInteraction(interaction) {
       if (!isStaff(interaction, guildId)) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Solo staff puede quitar participantes de un evento.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -495,7 +498,7 @@ export async function handleInteraction(interaction) {
         await interaction.update({
           embeds: [errorEmbed('No disponible', 'Evento no encontrado o ya cerrado.')],
           components: [],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -508,15 +511,15 @@ export async function handleInteraction(interaction) {
 
       const participants = getEventParticipants(eventId);
       const participantsWithNames = await enrichParticipantsWithNames(interaction.guild, participants);
+      await interaction.deferUpdate();
       const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
-      await interaction.update({
+      await interaction.editReply({
         embeds: [
           successEmbed('Participantes quitados', `Se quitaron **${removed}** participante(s) del evento #${eventId}.`),
           ...detail.embeds
         ],
         files: detail.files,
-        components: removeParticipantsRows(eventId, participantsWithNames),
-        ephemeral: true
+        components: removeParticipantsRows(eventId, participantsWithNames)
       });
       return;
     }
@@ -536,7 +539,7 @@ export async function handleInteraction(interaction) {
         await interaction.update({
           embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
           components: [],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -545,7 +548,7 @@ export async function handleInteraction(interaction) {
         await interaction.update({
           embeds: [errorEmbed('Sin participantes', 'No se puede cerrar sin participantes.')],
           components: [],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -553,7 +556,7 @@ export async function handleInteraction(interaction) {
       await interaction.update({
         embeds: [staffPromptEmbed('Asistentes', 'Selecciona quienes asistieron al evento.')],
         components: closeAttendeesRows(eventId, participantsWithNames),
-        ephemeral: true
+        flags: EPHEMERAL
       });
       return;
     }
@@ -565,7 +568,7 @@ export async function handleInteraction(interaction) {
       if (!canClose) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -584,7 +587,7 @@ export async function handleInteraction(interaction) {
           )
         ],
         components: closeAttendeesRows(eventId, participantsWithNames),
-        ephemeral: true
+        flags: EPHEMERAL
       });
       return;
     }
@@ -596,7 +599,7 @@ export async function handleInteraction(interaction) {
       if (!canClose) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -622,20 +625,21 @@ export async function handleInteraction(interaction) {
               'En eventos **Avaloniana** debés elegir una posición disponible en el menú de abajo.'
             )
           ],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
       const result = joinEvent(eventId, userId, guildId);
       if (!result.ok) {
-        await interaction.reply({ embeds: [errorEmbed('No se pudo unir', result.reason)], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('No se pudo unir', result.reason)], flags: EPHEMERAL });
         return;
       }
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
+      await interaction.deferReply({ flags: EPHEMERAL });
       const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [successEmbed('Inscripcion confirmada', `Te uniste al evento #${eventId}.`), ...detail.embeds],
         files: detail.files,
         components: eventDetailRows(
@@ -646,8 +650,7 @@ export async function handleInteraction(interaction) {
           event,
           participants,
           userId
-        ),
-        ephemeral: true
+        )
       });
       return;
     }
@@ -656,14 +659,15 @@ export async function handleInteraction(interaction) {
       const eventId = parseInt(customId.split(':')[1], 10);
       const left = leaveEvent(eventId, userId);
       if (!left) {
-        await interaction.reply({ embeds: [errorEmbed('No estabas inscripto', 'No figurabas como participante.')], ephemeral: true });
+        await interaction.reply({ embeds: [errorEmbed('No estabas inscripto', 'No figurabas como participante.')], flags: EPHEMERAL });
         return;
       }
       updateEventAnnouncementMessage(interaction.client, eventId).catch(() => {});
       const event = getEvent(eventId);
       const participants = getEventParticipants(eventId);
+      await interaction.deferReply({ flags: EPHEMERAL });
       const detail = await buildEventDetailPayload(event, participants, eventHasRoleSelection(event), interaction.guild);
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [successEmbed('Baja confirmada', `Saliste del evento #${eventId}.`), ...detail.embeds],
         files: detail.files,
         components: eventDetailRows(
@@ -674,8 +678,7 @@ export async function handleInteraction(interaction) {
           event,
           participants,
           userId
-        ),
-        ephemeral: true
+        )
       });
       return;
     }
@@ -684,7 +687,7 @@ export async function handleInteraction(interaction) {
       if (!isStaff(interaction, guildId)) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'No podés gestionar cuentas.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -694,7 +697,7 @@ export async function handleInteraction(interaction) {
       if (!targetId) {
         await interaction.reply({
           embeds: [errorEmbed('Error', 'No se seleccionó usuario.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -721,7 +724,7 @@ export async function handleInteraction(interaction) {
       if (!isStaff(interaction, guildId)) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Operación no autorizada.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -729,7 +732,7 @@ export async function handleInteraction(interaction) {
       if (!state || state.flow !== 'add' || !state.targetUserId) {
         await interaction.reply({
           embeds: [errorEmbed('Sesión expirada', 'Volvé a **Más opciones** → **Agregar silver**.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -740,7 +743,7 @@ export async function handleInteraction(interaction) {
       if (Number.isNaN(amount) || amount <= 0) {
         await interaction.reply({
           embeds: [errorEmbed('Monto inválido', 'Indicá un número mayor a 0.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -761,7 +764,7 @@ export async function handleInteraction(interaction) {
             `**+${amount.toLocaleString('es-ES')}** silver para <@${state.targetUserId}>.\nNuevo saldo: **${newBal.toLocaleString('es-ES')}** silver.`
           )
         ],
-        ephemeral: true
+        flags: EPHEMERAL
       });
       return;
     }
@@ -770,7 +773,7 @@ export async function handleInteraction(interaction) {
       if (!isStaff(interaction, guildId)) {
         await interaction.reply({
           embeds: [errorEmbed('Sin permiso', 'Operación no autorizada.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -778,7 +781,7 @@ export async function handleInteraction(interaction) {
       if (!state || state.flow !== 'remove' || !state.targetUserId) {
         await interaction.reply({
           embeds: [errorEmbed('Sesión expirada', 'Volvé a **Más opciones** → **Quitar silver**.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -789,7 +792,7 @@ export async function handleInteraction(interaction) {
       if (Number.isNaN(amount) || amount <= 0) {
         await interaction.reply({
           embeds: [errorEmbed('Monto inválido', 'Indicá un número mayor a 0.')],
-          ephemeral: true
+          flags: EPHEMERAL
         });
         return;
       }
@@ -809,15 +812,17 @@ export async function handleInteraction(interaction) {
             `Descontado **${deducted.toLocaleString('es-ES')}** silver de <@${state.targetUserId}>.\nNuevo saldo: **${newBalance.toLocaleString('es-ES')}** silver.`
           )
         ],
-        ephemeral: true
+        flags: EPHEMERAL
       });
       return;
     }
 
     if (interaction.isModalSubmit() && customId === `${PREFIX}create_event_modal`) {
+      await interaction.deferReply({ flags: EPHEMERAL });
+
       const state = getStaffState(userId);
       if (!state || state.flow !== 'create_event') {
-        await interaction.reply({ embeds: [errorEmbed('Sesion expirada', 'Volve a abrir Crear evento.')], ephemeral: true });
+        await interaction.editReply({ embeds: [errorEmbed('Sesion expirada', 'Volve a abrir Crear evento.')] });
         return;
       }
       const dateTimeStr = interaction.fields.getTextInputValue('event_datetime');
@@ -825,9 +830,8 @@ export async function handleInteraction(interaction) {
       const name = (interaction.fields.getTextInputValue('event_name') || '').trim();
       const scheduledAt = parseDateTimeInput(dateTimeStr);
       if (!scheduledAt) {
-        await interaction.reply({
-          embeds: [errorEmbed('Fecha invalida', 'Usa formato DD/MM/AAAA HH:MM (UTC).')],
-          ephemeral: true
+        await interaction.editReply({
+          embeds: [errorEmbed('Fecha invalida', 'Usa formato DD/MM/AAAA HH:MM (UTC).')]
         });
         return;
       }
@@ -866,25 +870,26 @@ export async function handleInteraction(interaction) {
         }
       }
       clearStaffState(userId);
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [successEmbed('Evento creado', creatorIsStaff
           ? `Evento #${eventId} creado con impacto contable: **${affectsAccounting ? 'SI' : 'NO'}**.`
-          : `Evento #${eventId} creado sin impacto contable (creador no staff).`)],
-        ephemeral: true
+          : `Evento #${eventId} creado sin impacto contable (creador no staff).`)]
       });
       return;
     }
 
     if (interaction.isModalSubmit() && customId === `${PREFIX}close_event_loot`) {
+      await interaction.deferReply({ flags: EPHEMERAL });
+
       const state = getStaffState(userId);
       if (!state || state.flow !== 'close_event') {
-        await interaction.reply({ embeds: [errorEmbed('Sesion expirada', 'Volve a seleccionar el evento.')], ephemeral: true });
+        await interaction.editReply({ embeds: [errorEmbed('Sesion expirada', 'Volve a seleccionar el evento.')] });
         return;
       }
       const event = getEvent(state.eventId);
       const canClose = !!event && (isStaff(interaction, guildId) || event.creator_id === userId);
       if (!canClose) {
-        await interaction.reply({ embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')], ephemeral: true });
+        await interaction.editReply({ embeds: [errorEmbed('Sin permiso', 'Solo staff o el creador del evento puede cerrarlo.')] });
         return;
       }
       const lootRaw = interaction.fields.getTextInputValue('loot_total').replace(',', '.').trim();
@@ -892,7 +897,7 @@ export async function handleInteraction(interaction) {
       const result = closeEvent(state.eventId, state.attendedIds, loot, userId);
       clearStaffState(userId);
       if (!result.ok) {
-        await interaction.reply({ embeds: [errorEmbed('No se pudo cerrar', result.reason)], ephemeral: true });
+        await interaction.editReply({ embeds: [errorEmbed('No se pudo cerrar', result.reason)] });
         return;
       }
       updateEventAnnouncementMessage(interaction.client, state.eventId).catch(() => {});
@@ -914,7 +919,7 @@ export async function handleInteraction(interaction) {
         }
       }
 
-      await interaction.reply({
+      await interaction.editReply({
         embeds: [
           successEmbed(
             'Evento cerrado',
@@ -922,8 +927,7 @@ export async function handleInteraction(interaction) {
               ? `Asistentes: **${result.attendedCount}**\nLoot total: **${result.totalLoot.toLocaleString('es-ES')}** silver\nReparto por persona: **${result.sharePerUser.toLocaleString('es-ES')}** silver\n\nSin comision al gremio: se reparte todo entre asistentes.`
               : `Asistentes: **${result.attendedCount}**\nEvento cerrado sin impacto contable (creado por usuario no staff).`
           )
-        ],
-        ephemeral: true
+        ]
       });
       return;
     }
@@ -931,12 +935,18 @@ export async function handleInteraction(interaction) {
     console.error('Interaction error:', err);
     const fallback = {
       embeds: [errorEmbed('Error', 'No se pudo completar la acción. Probá de nuevo.')],
-      ephemeral: true
+      flags: EPHEMERAL
     };
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(fallback).catch(() => {});
-    } else {
-      await interaction.reply(fallback).catch(() => {});
+    try {
+      if (interaction.deferred) {
+        await interaction.editReply(fallback);
+      } else if (interaction.replied) {
+        await interaction.followUp(fallback);
+      } else {
+        await interaction.reply(fallback);
+      }
+    } catch {
+      // interacción expirada o ya respondida
     }
   }
 }

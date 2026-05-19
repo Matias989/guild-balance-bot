@@ -40,23 +40,25 @@ export async function getAvalonianaEmojiMap(guild) {
     return map;
   }
 
-  for (const role of AVALONIANA_ROLES) {
-    const name = emojiNameForRole(role);
-    let emoji = existing.find((e) => e.name === name);
+  await Promise.all(
+    AVALONIANA_ROLES.map(async (role) => {
+      const name = emojiNameForRole(role);
+      let emoji = existing.find((e) => e.name === name);
 
-    if (!emoji && canManage) {
-      const imagePath = getAvalonianaRoleImagePath(role);
-      if (fs.existsSync(imagePath)) {
-        try {
-          emoji = await guild.emojis.create({ attachment: imagePath, name });
-        } catch (err) {
-          console.warn(`[Avaloniana] No se pudo crear emoji ${name}:`, err?.message);
+      if (!emoji && canManage) {
+        const imagePath = getAvalonianaRoleImagePath(role);
+        if (fs.existsSync(imagePath)) {
+          try {
+            emoji = await guild.emojis.create({ attachment: imagePath, name });
+          } catch (err) {
+            console.warn(`[Avaloniana] No se pudo crear emoji ${name}:`, err?.message);
+          }
         }
       }
-    }
 
-    if (emoji) map[role.name] = emoji;
-  }
+      if (emoji) map[role.name] = emoji;
+    })
+  );
 
   emojiCache.set(guild.id, map);
   return map;
