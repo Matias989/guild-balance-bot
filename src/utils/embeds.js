@@ -1,5 +1,5 @@
 import { EmbedBuilder } from 'discord.js';
-import { AVALONIANA_ROLES, formatAvalonianaRoleBoard } from './avalonianaRoles.js';
+import { formatAvalonianaRoleBoard, buildAvalonianaRosterDescription } from './avalonianaRoles.js';
 import {
   createAvalonianaBoardAttachment,
   getAvalonianaBoardAttachmentName
@@ -188,23 +188,6 @@ export function eventsListEmbed(events) {
   return embed;
 }
 
-function buildAvalonianaParticipantLines(participants) {
-  if (!participants.length) return 'Sin participantes';
-  const byRole = new Map(AVALONIANA_ROLES.map((r) => [r.name, []]));
-  for (const p of participants) {
-    if (byRole.has(p.role)) byRole.get(p.role).push(p);
-    else if (!byRole.has('Otros')) byRole.set('Otros', [p]);
-  }
-  const lines = [];
-  for (const { name } of AVALONIANA_ROLES) {
-    const list = byRole.get(name) || [];
-    if (list.length) {
-      lines.push(`**${name}**: ${list.map((p) => `<@${p.user_id}>`).join(', ')}`);
-    }
-  }
-  return lines.length ? lines.join('\n').slice(0, 1024) : 'Sin participantes';
-}
-
 export function eventDetailEmbed(event, participants, roleMode = false) {
   const isActive = event?.status === 'active';
   const isAvaloniana = event?.activity_type === 'Avaloniana';
@@ -227,11 +210,6 @@ export function eventDetailEmbed(event, participants, roleMode = false) {
     .setTimestamp();
 
   if (isAvaloniana) {
-    embed.addFields({
-      name: '👤 Participantes',
-      value: buildAvalonianaParticipantLines(participants),
-      inline: false
-    });
     return embed;
   }
 
@@ -247,26 +225,33 @@ export function eventDetailEmbed(event, participants, roleMode = false) {
   return embed;
 }
 
-/** Embed + adjunto del tablero con iconos PNG para eventos Avaloniana */
+/** Embed(s) + adjunto del tablero con iconos PNG para eventos Avaloniana */
 export async function buildEventDetailPayload(event, participants, roleMode = false) {
-  const embed = eventDetailEmbed(event, participants, roleMode);
+  const mainEmbed = eventDetailEmbed(event, participants, roleMode);
   const files = [];
 
   if (event?.activity_type === 'Avaloniana') {
+    const isActive = event?.status === 'active';
+    const rosterEmbed = new EmbedBuilder()
+      .setColor(isActive ? COLORS.primary : COLORS.info)
+      .setDescription(buildAvalonianaRosterDescription(participants));
+
     const board = await createAvalonianaBoardAttachment(participants);
     if (board) {
       files.push(board);
-      embed.setImage(`attachment://${getAvalonianaBoardAttachmentName()}`);
-    } else {
-      embed.addFields({
-        name: '📋 Posiciones',
-        value: formatAvalonianaRoleBoard(participants).slice(0, 1024),
-        inline: false
-      });
+      mainEmbed.setImage(`attachment://${getAvalonianaBoardAttachmentName()}`);
+      return { embeds: [mainEmbed, rosterEmbed], files };
     }
+
+    mainEmbed.addFields({
+      name: '📋 Posiciones',
+      value: formatAvalonianaRoleBoard(participants).slice(0, 1024),
+      inline: false
+    });
+    return { embeds: [mainEmbed, rosterEmbed], files };
   }
 
-  return { embeds: [embed], files };
+  return { embeds: [mainEmbed], files };
 }
 
 export function lootDistributionEmbed(event, lootTotal, sharePerPerson, attendedIds, affectsAccounting = true) {

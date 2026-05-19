@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import sharp from 'sharp';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { AttachmentBuilder } from 'discord.js';
 import {
   AVALONIANA_ROLES,
@@ -9,92 +9,79 @@ import {
 } from './avalonianaRoles.js';
 
 const BOARD_NAME = 'avaloniana-posiciones.png';
-const ICON_SIZE = 36;
-const ROW_H = 48;
-const PAD = 14;
-const WIDTH = 340;
+const ICON_SIZE = 40;
+const ROW_H = 52;
+const PAD = 16;
+const WIDTH = 380;
 
-function escapeXml(value) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function buildOverlaySvg(participants, width, height) {
-  const parts = [
-    `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">`,
-    `<rect x="1" y="1" width="${width - 2}" height="${height - 2}" rx="10" fill="none" stroke="#5865f2" stroke-width="2"/>`
-  ];
-
-  for (let i = 0; i < AVALONIANA_ROLES.length; i++) {
-    const role = AVALONIANA_ROLES[i];
-    const y = PAD + i * ROW_H;
-    const count = countRoleOccupancy(participants, role.name);
-    const textY = y + Math.floor(ROW_H / 2) + 6;
-    const nameX = PAD + ICON_SIZE + 18;
-
-    parts.push(
-      `<text x="${nameX}" y="${textY}" fill="#f2f3f5" font-size="15" font-family="Segoe UI, Arial, sans-serif" font-weight="600">${escapeXml(role.name)}</text>`,
-      `<text x="${width - PAD - 6}" y="${textY}" fill="#b5bac1" font-size="14" font-family="Segoe UI, Arial, sans-serif" text-anchor="end">(${count}/${role.max})</text>`
-    );
-
-    if (i < AVALONIANA_ROLES.length - 1) {
-      const lineY = y + ROW_H;
-      parts.push(
-        `<line x1="${PAD}" y1="${lineY}" x2="${width - PAD}" y2="${lineY}" stroke="#3f4147" stroke-width="1"/>`
-      );
-    }
-  }
-
-  parts.push('</svg>');
-  return Buffer.from(parts.join(''));
+function strokeRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 export async function createAvalonianaBoardAttachment(participants) {
   try {
     const rows = AVALONIANA_ROLES.length;
     const height = PAD * 2 + ROW_H * rows;
-    const iconLayers = [];
+    const canvas = createCanvas(WIDTH, height);
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#232428';
+    ctx.fillRect(0, 0, WIDTH, height);
+
+    ctx.strokeStyle = '#5865f2';
+    ctx.lineWidth = 2;
+    strokeRoundRect(ctx, 1, 1, WIDTH - 2, height - 2, 10);
+    ctx.stroke();
 
     for (let i = 0; i < AVALONIANA_ROLES.length; i++) {
       const role = AVALONIANA_ROLES[i];
       const y = PAD + i * ROW_H;
-      const iconPath = getAvalonianaRoleImagePath(role);
+      const count = countRoleOccupancy(participants, role.name);
+      const textY = y + ROW_H / 2;
 
-      if (!fs.existsSync(iconPath)) {
-        console.warn(`[Avaloniana] Falta imagen: ${path.basename(iconPath)}`);
-        continue;
+      if (i > 0) {
+        ctx.strokeStyle = '#3f4147';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(PAD, y);
+        ctx.lineTo(WIDTH - PAD, y);
+        ctx.stroke();
       }
 
-      const iconBuf = await sharp(iconPath)
-        .resize(ICON_SIZE, ICON_SIZE, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-        .png()
-        .toBuffer();
+      const iconPath = getAvalonianaRoleImagePath(role);
+      if (fs.existsSync(iconPath)) {
+        const img = await loadImage(iconPath);
+        const iconY = y + (ROW_H - ICON_SIZE) / 2;
+        ctx.drawImage(img, PAD + 4, iconY, ICON_SIZE, ICON_SIZE);
+      } else {
+        console.warn(`[Avaloniana] Falta imagen: ${path.basename(iconPath)}`);
+      }
 
-      iconLayers.push({
-        input: iconBuf,
-        left: PAD + 4,
-        top: y + Math.floor((ROW_H - ICON_SIZE) / 2)
-      });
+      const nameX = PAD + ICON_SIZE + 14;
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f2f3f5';
+      ctx.font = 'bold 16px Arial, Helvetica, sans-serif';
+      ctx.fillText(role.name, nameX, textY);
+
+      const slotText = `(${count}/${role.max})`;
+      ctx.fillStyle = '#b5bac1';
+      ctx.font = '14px Arial, Helvetica, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(slotText, WIDTH - PAD - 4, textY);
     }
 
-    const overlay = buildOverlaySvg(participants, WIDTH, height);
-    const layers = [...iconLayers, { input: overlay, top: 0, left: 0 }];
-
-    const buffer = await sharp({
-      create: {
-        width: WIDTH,
-        height,
-        channels: 4,
-        background: { r: 35, g: 36, b: 40, alpha: 255 }
-      }
-    })
-      .composite(layers)
-      .png()
-      .toBuffer();
-
+    const buffer = canvas.toBuffer('image/png');
     return new AttachmentBuilder(buffer, { name: BOARD_NAME });
   } catch (err) {
     console.error('Error generando tablero Avaloniana:', err?.message);

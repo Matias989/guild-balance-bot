@@ -44,6 +44,29 @@ export function getAvailableAvalonianaRoleOptions(participants, userId) {
   });
 }
 
+/** Texto con menciones debajo de cada posición (segundo embed, bajo la imagen del tablero) */
+export function buildAvalonianaRosterDescription(participants) {
+  const byRole = new Map(AVALONIANA_ROLES.map((r) => [r.name, []]));
+  for (const p of participants || []) {
+    if (byRole.has(p.role)) byRole.get(p.role).push(p);
+  }
+
+  const blocks = [];
+  for (const role of AVALONIANA_ROLES) {
+    const count = countRoleOccupancy(participants, role.name);
+    const members = byRole.get(role.name) || [];
+    const lines = [`${role.icon} **${role.name}** (${count}/${role.max})`];
+    if (members.length) {
+      for (const p of members) {
+        lines.push(`<@${p.user_id}>`);
+      }
+    }
+    blocks.push(lines.join('\n'));
+  }
+
+  return blocks.join('\n\n').slice(0, 4096);
+}
+
 export function formatAvalonianaRoleBoard(participants) {
   const innerWidth = 28;
   const lines = AVALONIANA_ROLES.map(({ name, max, icon }) => {
